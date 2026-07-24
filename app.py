@@ -12,11 +12,17 @@ app.secret_key = os.environ.get('SECRET_KEY', 'fallback-dev-secret-key-123')
 # Хранилище пользователей (ПАРОЛИ ТЕПЕРЬ ЗАХЕШИРОВАНЫ)
 users = [
     {
-        'login': 'rob4ikyay', 
-        # Пароль 'wowwow' преобразован в безопасный хеш. Не храни пароли в открытом виде!
-        'password_hash': generate_password_hash('wowwow'), 
+        'login': 'Rob4ik', 
+        'password_hash': generate_password_hash('secret'), 
         'reg_date': '14.05.2026', 
         'plan': 'Developer Tier', 
+        'dev_approved': 'Yes'
+    },
+    {
+        'login': 'PQruX', 
+        'password_hash': generate_password_hash('pqrux'), 
+        'reg_date': '25.07.2026', 
+        'plan': 'Helper Tier', 
         'dev_approved': 'Yes'
     },
 ]
