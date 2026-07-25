@@ -13,8 +13,8 @@ from datetime import datetime, timedelta
 import pytz
 
 # --- НАСТРОЙКИ ANYPAY.IO ---
-ANYPAY_MERCHANT_ID = "JKM95WB5BOCX8KP4A2" 
-ANYPAY_SECRET_KEY_1 = "WhBnybt73zKilvcgcjSVJCShtdi8xOZSHqUSaG7" 
+ANYPAY_MERCHANT_ID = "18042" 
+ANYPAY_SECRET_KEY_1 = "rj7GtfmHc9AIAUtX7L5MTbMyb5jEo5h8bYErMGK" 
 ANYPAY_SECRET_KEY_2 = "" 
 
 # --- СИСТЕМА ЛОГИРОВАНИЯ КОНСОЛИ ---
