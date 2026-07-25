@@ -14,8 +14,8 @@ import pytz
 
 # --- НАСТРОЙКИ ANYPAY.IO ---
 ANYPAY_MERCHANT_ID = "18042" 
-ANYPAY_SECRET_KEY_1 = "rj7GtfmHc9AIAUtX7L5MTbMyb5jEo5h8bYErMGK" 
-ANYPAY_SECRET_KEY_2 = "" 
+ANYPAY_SECRET_KEY_1 = "WhBnybt73zKilvcgcjSVJCShtdi8xOZSHqUSaG7" 
+ANYPAY_SECRET_KEY_2 = "WhBnybt73zKilvcgcjSVJCShtdi8xOZSHqUSaG7" 
 
 # --- СИСТЕМА ЛОГИРОВАНИЯ КОНСОЛИ ---
 LIVE_LOGS = []
@@ -97,6 +97,12 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id INTEGER NOT NULL, sender TEXT NOT NULL,
             message TEXT NOT NULL, sent_at TEXT NOT NULL)''')
 
+    # ТАБЛИЦА СКРИПТОВ
+    conn.execute('''CREATE TABLE IF NOT EXISTS scripts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, game TEXT NOT NULL,
+            banner_url TEXT NOT NULL, release_date TEXT NOT NULL, script_code TEXT NOT NULL, 
+            description TEXT NOT NULL, is_frozen TEXT DEFAULT 'No')''')
+
     conn.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('maintenance', 'No')")
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('discord_link', 'https://discord.gg/')")
@@ -108,6 +114,16 @@ def init_db():
         conn.execute('''INSERT INTO users (login, password_hash, email, secret, source, reg_date, plan, plan_days, dev_approved, is_frozen, pending_reward)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', ('Rob4ikDev', generate_password_hash('baconsecret6666'), '', 'globalscript', 'creator', reg_date, 'Developer Tier', 999, 'Yes', 'No', ''))
     
+    s_cursor = conn.execute("SELECT * FROM scripts")
+    if not s_cursor.fetchone():
+        tz = pytz.timezone('Europe/Moscow')
+        default_date = datetime.now(tz).strftime('%Y-%m-%dT%H:%M')
+        conn.execute('''INSERT INTO scripts (title, game, banner_url, release_date, script_code, description, is_frozen)
+            VALUES (?, ?, ?, ?, ?, ?, ?)''', 
+            ('Oxygen Hub Script', 'Muscle Legends', 'https://static.wikia.nocookie.net/muscle-legends/images/5/50/Wiki-background/revision/latest/scale-to-width-down/670', 
+            default_date, 'loadstring(game:HttpGet("https://raw.githubusercontent.com/Rob4ik02/Muscle-Legends-Roblox/refs/heads/main/Muscle%20Legends/Sirius%20Library/Loader.lua"))()', 
+            'Good script, works in beta version. There are some bugs or errors. They say it will be updated.', 'No'))
+
     conn.commit(); conn.close()
     c_log('SUCCESS', "Database loaded successfully.")
 
@@ -120,8 +136,11 @@ TEMPLATE = '''
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="anypay-verification" content="7641a8b9610252ee169f2815a5c2" />
 <title>Global Script's Hub</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Подключение Lucide Icons через JSDelivr (защита от блокировок) -->
+<script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
 <style>
 :root {
   --bg-color: #000000; --text-primary: #ffffff; --text-secondary: #888888;
@@ -188,9 +207,9 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
 
 .form-container { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; background: var(--card-bg); backdrop-filter: var(--blur); padding: 24px; border: 1px solid var(--card-border); border-radius: 28px; box-shadow: var(--shadow-drop); width: 100%; max-width: 360px; transition: all 0.4s; }
 .form-header-text { margin: 0 0 6px 0; font-size: 14px; color: var(--text-primary); font-weight: 600; text-align: center; }
-.form-container input { width: 100%; padding: 12px 16px; font-size: 13px; font-family: inherit; font-weight: 500; color: var(--text-primary); background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 14px; outline: none; transition: all 0.3s; }
-.form-container input::placeholder { color: var(--text-secondary); }
-.form-container input:focus { border-color: var(--text-primary); transform: scale(1.02); }
+.form-container input, .form-container textarea { width: 100%; padding: 12px 16px; font-size: 13px; font-family: inherit; font-weight: 500; color: var(--text-primary); background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 14px; outline: none; transition: all 0.3s; }
+.form-container input::placeholder, .form-container textarea::placeholder { color: var(--text-secondary); }
+.form-container input:focus, .form-container textarea:focus { border-color: var(--text-primary); transform: scale(1.02); }
 .form-container button { width: 100%; padding: 12px; font-size: 14px; font-weight: 700; color: var(--accent-text); background: var(--accent); border: none; border-radius: 14px; cursor: pointer; transition: all 0.4s; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
 .form-container button:not(:disabled):hover { transform: translateY(-2px) scale(1.02); }
 .form-container button:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -229,17 +248,20 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
 .sidebar h2 { margin: 0 0 16px 0; font-size: 14px; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1px; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .sidebar-footer { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--card-border); }
-.sidebar-btn { background: transparent; color: var(--text-primary); border: none; padding: 10px 14px; border-radius: 14px; font-family: inherit; cursor: pointer; text-align: left; transition: all 0.3s; display: flex; flex-direction: column; gap: 2px; }
+.sidebar-btn { background: transparent; color: var(--text-primary); border: none; padding: 10px 14px; border-radius: 14px; font-family: inherit; cursor: pointer; text-align: left; transition: all 0.3s; display: flex; gap: 12px; align-items: center; }
+.sidebar-btn .lucide { width: 20px; height: 20px; color: var(--text-secondary); transition: color 0.3s; }
 .sidebar-btn:hover { background: var(--input-border); transform: translateX(4px); }
 .sidebar-btn.active { background: var(--text-primary); color: var(--bg-color); transform: scale(1.03); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.sidebar-btn.active .lucide { color: var(--bg-color); }
 .sidebar-btn.active .btn-desc { color: var(--bg-color); opacity: 0.8; }
+.btn-text-content { display: flex; flex-direction: column; gap: 2px; }
 .btn-title { font-weight: 600; font-size: 13px; text-transform: uppercase; }
 .btn-desc { font-weight: 400; font-size: 11px; color: var(--text-secondary); line-height: 1.3; }
 
 .main-content { flex: 1; display: flex; flex-direction: column; position: relative; height: 100%; }
 .tab-content { display: none; flex-direction: column; gap: 16px; height: 100%; }
 .tab-content.active { display: flex; animation: elasticBounce 0.6s forwards; }
-.tab-content h2 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+.tab-content h2 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; display: flex; align-items: center; gap: 10px;}
 
 .dashboard-card { background: var(--card-bg); backdrop-filter: var(--blur); border: 1px solid var(--card-border); border-radius: 28px; padding: 26px; box-shadow: var(--shadow-drop); color: var(--text-secondary); font-size: 14px; line-height: 1.6; display: flex; flex-direction: column; }
 
@@ -258,7 +280,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
 .profile-label { font-size: 11px; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1px; }
 .profile-value { font-size: 15px; font-weight: 600; color: var(--text-primary); }
 
-.action-btn { background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 12px 18px; border-radius: 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+.action-btn { background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 12px 18px; border-radius: 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: flex; align-items: center; justify-content: center; gap: 8px;}
 .action-btn:hover { background: var(--card-border); transform: scale(1.03); box-shadow: 0 6px 15px rgba(0,0,0,0.2); }
 .danger-btn { color: var(--error); } .danger-btn:hover { background: rgba(234, 21, 21, 0.1); border-color: var(--error); }
 
@@ -266,17 +288,25 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
 .dev-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; color: var(--text-primary); background: rgba(20,20,20,0.4); border-radius: 14px; overflow: hidden; }
 .dev-table th, .dev-table td { padding: 10px 14px; border-bottom: 1px solid var(--card-border); }
 .dev-select { background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--card-border); padding: 10px; border-radius: 10px; outline: none; font-family: inherit; font-size: 12px; width: 100%; }
-.dev-btn-sm { padding: 6px 10px; font-size: 11px; border-radius: 8px; background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--card-border); cursor: pointer; transition: all 0.2s ease; }
+.dev-btn-sm { padding: 6px 10px; font-size: 11px; border-radius: 8px; background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--card-border); cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 4px; justify-content: center;}
 .dev-btn-sm:hover { background: var(--text-primary); color: var(--bg-color); }
 .dev-btn-danger { border-color: var(--error); color: var(--error); } .dev-btn-danger:hover { background: var(--error); color: #fff; }
 
 .web-console { background: #050505; border: 1px solid #222; border-radius: 14px; padding: 14px; font-family: monospace; font-size: 12px; max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
 .web-log-info { color: #ffffff; } .web-log-success { color: #34c759; } .web-log-warning { color: #ff9f0a; } .web-log-error { color: #ff453a; } .web-log-service { color: #8e8e93; }
 
-.script-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 24px; overflow: hidden; display: flex; flex-direction: column; transition: transform 0.3s; }
-.script-banner { width: 100%; height: 120px; background: url('https://static.wikia.nocookie.net/muscle-legends/images/5/50/Wiki-background/revision/latest/scale-to-width-down/670') center/cover; position: relative; display: flex; justify-content: center; padding-top: 15px; }
-.script-banner::after { content: ''; position: absolute; bottom: -1px; left: 0; width: 100%; height: 60px; background: linear-gradient(to bottom, transparent, var(--bg-color)); opacity: 0.85; }
-.script-content { padding: 0 20px 20px 20px; position: relative; z-index: 2; display: flex; flex-direction: column; gap: 8px; }
+.scripts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; width: 100%; }
+.script-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 24px; overflow: hidden; display: flex; flex-direction: column; transition: transform 0.3s; box-shadow: var(--shadow-drop); }
+.script-card:hover { transform: scale(1.02); }
+.script-banner { width: 100%; height: 140px; background-size: cover; background-position: center; position: relative; display: flex; justify-content: center; padding-top: 15px; }
+.script-banner::after { content: ''; position: absolute; bottom: -1px; left: 0; width: 100%; height: 80px; background: linear-gradient(to bottom, transparent, var(--card-bg)); opacity: 1; }
+.script-content { padding: 0 20px 20px 20px; position: relative; z-index: 2; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.script-header h3 { margin: 0; font-size: 18px; color: var(--text-primary); display: flex; flex-direction: column; gap: 2px; }
+.game-tag { font-size: 11px; font-weight: 600; opacity: 0.6; text-transform: uppercase; letter-spacing: 1px;}
+.script-desc { margin: 0; font-size: 13px; color: var(--text-secondary); line-height: 1.5; flex: 1; }
+.copy-btn { background: var(--accent); color: var(--accent-text); border: none; padding: 12px; border-radius: 14px; font-weight: 700; font-family: 'Inter', monospace; cursor: pointer; text-transform: uppercase; font-size: 13px; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: auto;}
+.copy-btn:not(:disabled):hover { transform: scale(1.02); }
+.copy-btn:disabled { opacity: 0.5; cursor: not-allowed; background: var(--input-bg); color: var(--text-secondary); border: 1px solid var(--input-border); }
 
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(15px); z-index: 10000; display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: opacity 0.4s; }
 .modal-overlay.active { opacity: 1; pointer-events: auto; }
@@ -294,7 +324,6 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
 .ticket-item { background: var(--input-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; transition: 0.3s; opacity: 0.5; }
 .ticket-item.closed { opacity: 0.3 !important; pointer-events: none; }
 .ticket-item.active { opacity: 1 !important; border-color: var(--accent); }
-.ticket-icon { font-size: 20px; font-weight: 900; color: #ff9f0a; margin-right: 10px; }
 .chat-box { background: rgba(0,0,0,0.5); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px; flex-grow: 1; min-height: 200px; max-height: 300px; overflow-y: auto; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px;}
 .chat-msg { padding: 8px 12px; border-radius: 12px; font-size: 13px; max-width: 80%; line-height: 1.4; word-wrap: break-word;}
 .chat-msg.user { background: var(--input-border); align-self: flex-start; color: var(--text-primary);}
@@ -389,7 +418,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
       <button class="ui-pill" id="themeBtn" data-i18n="theme_btn">Light Mode</button>
     </div>
     <div class="top-bar-right" id="userWrapper" style="{{ 'display:none;' if not current_user else 'display:flex;' }}">
-      <div class="ui-pill" id="userDisplay">{{ current_user or '' }}</div>
+      <div class="ui-pill" id="userDisplay"><i data-lucide="user" style="width:14px; height:14px;"></i> <span id="userLoginText">{{ current_user or '' }}</span></div>
       <button class="ui-pill logout-btn" id="logoutBtn" data-i18n="logout">Logout</button>
     </div>
   </div>
@@ -451,21 +480,21 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
       <div class="sidebar">
         <h2 data-i18n="menu">MENU</h2>
         <div class="sidebar-nav">
-          <button class="sidebar-btn active" data-target="tab-main"><div class="btn-title" data-i18n="m_main">MAIN</div><div class="btn-desc" data-i18n="m_main_d">Your main profile</div></button>
-          <button class="sidebar-btn" data-target="tab-keys"><div class="btn-title" data-i18n="m_key">KEY SYSTEM</div><div class="btn-desc" data-i18n="m_key_d">Get a key</div></button>
-          <button class="sidebar-btn" data-target="tab-scripts"><div class="btn-title" data-i18n="m_scr">SCRIPTS</div><div class="btn-desc" data-i18n="m_scr_d">Game scripts</div></button>
-          <button class="sidebar-btn" data-target="tab-plans"><div class="btn-title" data-i18n="m_plan">PLANS</div><div class="btn-desc" data-i18n="m_plan_d">Buy plans</div></button>
-          <button class="sidebar-btn" data-target="tab-faq"><div class="btn-title" data-i18n="m_faq">FAQ</div><div class="btn-desc" data-i18n="m_faq_d">Got questions?</div></button>
+          <button class="sidebar-btn active" data-target="tab-main"><i data-lucide="home"></i><div class="btn-text-content"><div class="btn-title" data-i18n="m_main">MAIN</div><div class="btn-desc" data-i18n="m_main_d">Your main profile</div></div></button>
+          <button class="sidebar-btn" data-target="tab-keys"><i data-lucide="key"></i><div class="btn-text-content"><div class="btn-title" data-i18n="m_key">KEY SYSTEM</div><div class="btn-desc" data-i18n="m_key_d">Get a key</div></div></button>
+          <button class="sidebar-btn" data-target="tab-scripts"><i data-lucide="file-code"></i><div class="btn-text-content"><div class="btn-title" data-i18n="m_scr">SCRIPTS</div><div class="btn-desc" data-i18n="m_scr_d">Game scripts</div></div></button>
+          <button class="sidebar-btn" data-target="tab-plans"><i data-lucide="shopping-cart"></i><div class="btn-text-content"><div class="btn-title" data-i18n="m_plan">PLANS</div><div class="btn-desc" data-i18n="m_plan_d">Buy plans</div></div></button>
+          <button class="sidebar-btn" data-target="tab-faq"><i data-lucide="help-circle"></i><div class="btn-text-content"><div class="btn-title" data-i18n="m_faq">FAQ</div><div class="btn-desc" data-i18n="m_faq_d">Got questions?</div></div></button>
         </div>
         <div class="sidebar-footer">
-          <button class="sidebar-btn sidebar-btn-footer" data-target="tab-developers" id="navDevBtn" style="display:none;"><div class="btn-title" data-i18n="m_dev">DEVELOPERS</div><div class="btn-desc" data-i18n="m_dev_d">Admin Panel</div></button>
-          <button class="sidebar-btn sidebar-btn-footer" data-target="tab-discord"><div class="btn-title" data-i18n="m_disc">DISCORD</div><div class="btn-desc" data-i18n="m_disc_d">Join us</div></button>
+          <button class="sidebar-btn sidebar-btn-footer" data-target="tab-developers" id="navDevBtn" style="display:none;"><i data-lucide="server"></i><div class="btn-text-content"><div class="btn-title" data-i18n="m_dev">DEVELOPERS</div><div class="btn-desc" data-i18n="m_dev_d">Admin Panel</div></div></button>
+          <button class="sidebar-btn sidebar-btn-footer" data-target="tab-discord"><i data-lucide="message-square"></i><div class="btn-text-content"><div class="btn-title" data-i18n="m_disc">DISCORD</div><div class="btn-desc" data-i18n="m_disc_d">Join us</div></div></button>
         </div>
       </div>
       
       <div class="main-content">
         <div class="tab-content active" id="tab-main">
-          <h2 data-i18n="u_prof">User Profile</h2>
+          <h2 data-i18n="u_prof"><i data-lucide="user" style="width:28px; height:28px;"></i> User Profile</h2>
           <div class="dashboard-card">
             <p style="color: var(--text-primary); font-weight: 600; font-size: 16px; margin-bottom: 4px;" data-i18n="acc_det">Account Details</p>
             <div class="profile-grid">
@@ -478,31 +507,27 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
         </div>
 
         <div class="tab-content" id="tab-keys">
-          <h2 data-i18n="k_gen">Key Generator</h2>
+          <h2 data-i18n="k_gen"><i data-lucide="key" style="width:28px; height:28px;"></i> Key Generator</h2>
           <div class="dashboard-card">
             <p style="color: var(--text-primary); font-weight: 600; font-size: 16px; margin-bottom: 8px;" data-i18n="k_unl">Unlock Free Access</p>
             <p data-i18n="k_desc">Create unique HWID keys. Keys last 12 hours.</p>
             <div id="generatedKeyDisplay" class="key-box" style="display:none;"></div>
-            <button class="action-btn" style="margin-top: 10px; width: 100%;" onclick="generateKey(false)" data-i18n="k_btn">Generate New Key</button>
-            <button class="action-btn danger-btn" id="devForceKeyBtn" style="display:none; margin-top: 10px; width: 100%;" onclick="generateKey(true)">FORCE GENERATE (DEV)</button>
+            <button class="action-btn" style="margin-top: 10px; width: 100%;" onclick="generateKey(false)" data-i18n="k_btn"><i data-lucide="zap" style="width:16px;height:16px;"></i> Generate New Key</button>
+            <button class="action-btn danger-btn" id="devForceKeyBtn" style="display:none; margin-top: 10px; width: 100%;" onclick="generateKey(true)"><i data-lucide="zap-off" style="width:16px;height:16px;"></i> FORCE GENERATE (DEV)</button>
             <div id="keyMessage"></div>
           </div>
         </div>
 
+        <!-- ВКЛАДКА СКРИПТОВ (ПОЛЬЗОВАТЕЛЬСКАЯ) -->
         <div class="tab-content" id="tab-scripts">
-          <h2 data-i18n="s_lib">Scripts Library</h2>
-          <div class="script-card">
-            <div class="script-banner"><div class="banner-title">MUSCLE LEGENDS</div></div>
-            <div class="script-content">
-              <div class="script-header"><h3>Oxygen Hub Script <span class="game-tag">for game: Muscle Legends</span></h3></div>
-              <p class="script-desc" data-i18n="s_good">Good script, works in beta version.</p>
-              <button class="copy-btn" onclick="copyLuaScript(this)" data-i18n="s_copy">CLICK TO COPY LUA SCRIPT</button>
-            </div>
+          <h2 data-i18n="s_lib"><i data-lucide="file-code" style="width:28px; height:28px;"></i> Scripts Library</h2>
+          <div class="scripts-grid" id="userScriptsContainer">
+             <!-- Скрипты загружаются динамически -->
           </div>
         </div>
 
         <div class="tab-content" id="tab-plans">
-          <h2 data-i18n="p_upg">Upgrade Plans</h2>
+          <h2 data-i18n="p_upg"><i data-lucide="shopping-cart" style="width:28px; height:28px;"></i> Upgrade Plans</h2>
           <div class="plans-switch">
             <button class="plan-sub-btn active" id="btnBuyPlan" onclick="switchPlanSubTab('buy')" data-i18n="p_buy">Buy Plan</button>
             <button class="plan-sub-btn" id="btnMyPlan" onclick="switchPlanSubTab('my')" data-i18n="p_my">My Current Plan</button>
@@ -519,30 +544,26 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
                <h3 id="planGreeting" style="margin: 0; color: var(--text-primary); font-size: 20px;">Hi!</h3>
                <p id="planCurrentStatus" style="margin:0; font-weight: 600; color: var(--accent);">Your current plan: --</p>
                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
-                  <button class="action-btn" onclick="requestRestartPlan()" data-i18n="p_rest">Restart Plan</button>
-                  <button class="action-btn" onclick="openReceipts()" data-i18n="r_hist_btn">Receipts (Чеки)</button>
-                  <button class="action-btn danger-btn" onclick="requestDeleteAccount()" data-i18n="p_del">Delete Account</button>
+                  <button class="action-btn" onclick="requestRestartPlan()" data-i18n="p_rest"><i data-lucide="refresh-cw" style="width:16px;height:16px;"></i> Restart Plan</button>
+                  <button class="action-btn" onclick="openReceipts()" data-i18n="r_hist_btn"><i data-lucide="receipt" style="width:16px;height:16px;"></i> Receipts</button>
+                  <button class="action-btn danger-btn" onclick="requestDeleteAccount()" data-i18n="p_del"><i data-lucide="trash-2" style="width:16px;height:16px;"></i> Delete Account</button>
                </div>
              </div>
           </div>
         </div>
         
-        <!-- ВКЛАДКА ПОЛЬЗОВАТЕЛЯ FAQ / SUPPORT -->
         <div class="tab-content" id="tab-faq">
-          <h2 data-i18n="f_tit">FAQ & Support</h2>
-          
+          <h2 data-i18n="f_tit"><i data-lucide="help-circle" style="width:28px; height:28px;"></i> FAQ & Support</h2>
           <div class="dashboard-card" id="userTicketFormCard">
               <p data-i18n="f_desc" style="font-size: 16px; font-weight: bold;">Got questions? We answer fast!</p>
               <hr style="border-top: 1px solid var(--card-border); border-bottom: none; margin: 16px 0;">
-              
               <input type="text" id="uTicketReason" class="dev-select" data-i18n-ph="t_reason_ph" placeholder="Reason for support..." style="margin-bottom: 12px; width: 100%;">
               <select id="uTicketPriority" class="dev-select" style="margin-bottom: 12px; width: 100%;">
                   <option value="Normal" data-i18n="t_norm">Normal Speed</option>
                   <option value="Fast" data-i18n="t_fast">Fast Response</option>
               </select>
-              <button class="action-btn" style="width: 100%;" onclick="submitUserTicket()" data-i18n="t_send">Send Support Request</button>
+              <button class="action-btn" style="width: 100%;" onclick="submitUserTicket()" data-i18n="t_send"><i data-lucide="send" style="width:16px;height:16px;"></i> Send Support Request</button>
           </div>
-
           <div class="dashboard-card" id="userTicketChatCard" style="display:none; padding: 20px; flex-direction: column;">
               <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                   <h4 style="margin:0; color: var(--text-primary);" id="uChatStatus">Support Chat</h4>
@@ -551,42 +572,70 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
               <div class="chat-box" id="uChatBox"></div>
               <div style="display:flex; gap:8px;" id="uChatInputs">
                   <input type="text" id="uChatInput" class="dev-select" data-i18n-ph="t_msg_ph" placeholder="Type a message..." style="flex:1;">
-                  <button class="dev-btn-sm" onclick="sendTicketMessage('user')" data-i18n="t_reply">Send</button>
+                  <button class="dev-btn-sm" onclick="sendTicketMessage('user')" data-i18n="t_reply"><i data-lucide="send" style="width:14px;height:14px;"></i></button>
               </div>
           </div>
         </div>
         
         <!-- ВКЛАДКА РАЗРАБОТЧИКА (ADMIN PANEL) -->
         <div class="tab-content" id="tab-developers">
-          <h2 data-i18n="d_tit">Developers</h2>
+          <h2 data-i18n="d_tit"><i data-lucide="server" style="width:28px; height:28px;"></i> Developers</h2>
           
           <div id="devAdminView" style="display: flex; flex-direction: column; gap: 20px;">
+             
+             <!-- УПРАВЛЕНИЕ СКРИПТАМИ (НОВОЕ) -->
+             <div class="dashboard-card">
+                 <h4 style="margin: 0 0 10px 0; color: var(--text-primary); display:flex; align-items:center; gap:8px;"><i data-lucide="file-code" style="width:18px;height:18px;"></i> Script Management</h4>
+                 <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
+                     <input type="hidden" id="devScriptId">
+                     <div style="display:flex; gap:10px;">
+                         <input type="text" id="devScriptTitle" class="dev-select" placeholder="Script Title (e.g. Oxygen Hub)" style="flex:1;">
+                         <input type="text" id="devScriptGame" class="dev-select" placeholder="Game Name (e.g. Muscle Legends)" style="flex:1;">
+                     </div>
+                     <input type="text" id="devScriptBanner" class="dev-select" placeholder="Banner Image URL">
+                     <div style="display:flex; gap:10px; align-items:center;">
+                         <span style="font-size:12px; color:var(--text-secondary); white-space:nowrap;">Release Date:</span>
+                         <input type="datetime-local" id="devScriptDate" class="dev-select" style="flex:1;">
+                     </div>
+                     <input type="text" id="devScriptCode" class="dev-select" placeholder="Lua Code (loadstring...)">
+                     <textarea id="devScriptDesc" class="dev-select" placeholder="Description..." rows="2"></textarea>
+                     <div style="display:flex; gap:10px;">
+                         <button class="action-btn" style="flex:1;" onclick="saveAdminScript()"><i data-lucide="plus" style="width:16px;height:16px;"></i> Add / Update Script</button>
+                         <button class="action-btn danger-btn" onclick="clearScriptForm()"><i data-lucide="x" style="width:16px;height:16px;"></i> Clear Form</button>
+                     </div>
+                 </div>
+                 <div class="dev-table-wrapper" style="max-height:200px; overflow-y:auto;">
+                    <table class="dev-table">
+                       <thead><tr><th>Title</th><th>Game</th><th>Release Date</th><th>Actions</th></tr></thead>
+                       <tbody id="devScriptsTableBody"></tbody>
+                    </table>
+                 </div>
+             </div>
+
              <!-- TICKETS SYSTEM ADMIN -->
              <div class="dashboard-card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <h4 style="margin:0; color: var(--text-primary);">Support Tickets</h4>
+                    <h4 style="margin:0; color: var(--text-primary); display:flex; align-items:center; gap:8px;"><i data-lucide="inbox" style="width:18px;height:18px;"></i> Support Tickets</h4>
                     <button class="dev-btn-sm" id="btnShowAllTickets" style="display:none;" onclick="toggleAllTickets()" data-i18n="t_show_all">Show All</button>
                 </div>
                 <div id="adminTicketsContainer" style="display: flex; flex-direction: column; max-height: 400px; overflow-y: auto;">
                     <!-- Tickets injected here -->
                 </div>
-                
-                <!-- Chat View Admin -->
                 <div id="adminChatView" style="display:none; margin-top: 15px; border-top: 1px solid var(--card-border); padding-top: 15px;">
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                         <span id="adminChatTitle" style="color:var(--text-primary); font-weight:bold;">Chat with User</span>
-                        <button class="dev-btn-sm dev-btn-danger" onclick="closeActiveTicket()" data-i18n="t_close">Close Ticket</button>
+                        <button class="dev-btn-sm dev-btn-danger" onclick="closeActiveTicket()" data-i18n="t_close"><i data-lucide="x-circle" style="width:14px;height:14px;"></i> Close</button>
                     </div>
                     <div class="chat-box" id="aChatBox"></div>
                     <div style="display:flex; gap:8px;">
                         <input type="text" id="aChatInput" class="dev-select" placeholder="Reply..." style="flex:1;">
-                        <button class="dev-btn-sm" onclick="sendTicketMessage('admin')" data-i18n="t_reply">Send</button>
+                        <button class="dev-btn-sm" onclick="sendTicketMessage('admin')" data-i18n="t_reply"><i data-lucide="send" style="width:14px;height:14px;"></i></button>
                     </div>
                 </div>
              </div>
 
              <div class="dashboard-card">
-                <h4 style="margin: 0 0 10px 0; color: var(--text-primary);">Account Management</h4>
+                <h4 style="margin: 0 0 10px 0; color: var(--text-primary); display:flex; align-items:center; gap:8px;"><i data-lucide="users" style="width:18px;height:18px;"></i> Account Management</h4>
                 <div class="dev-table-wrapper">
                    <table class="dev-table">
                       <thead><tr><th>User</th><th>Current Plan</th><th>Days</th><th>Change Plan</th><th>Actions</th></tr></thead>
@@ -596,32 +645,26 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
              </div>
              
              <div class="dashboard-card">
-                <h4 style="margin: 0 0 10px 0; color: var(--text-primary);">Site Infrastructure</h4>
-                <p style="margin-top:0; font-size: 13px;">Database and backend core controls.</p>
+                <h4 style="margin: 0 0 10px 0; color: var(--text-primary); display:flex; align-items:center; gap:8px;"><i data-lucide="settings" style="width:18px;height:18px;"></i> Site Infrastructure</h4>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                    <button class="dev-btn-sm" id="btnToggleMaintenance" onclick="adminToggleMaintenance()"></button>
-                   <button class="dev-btn-sm" onclick="showConfirm('Flush Cache', 'Are you sure you want to flush all system caches?', 'Flush', false, () => { showConfirm('Success', 'All caches purged successfully!', 'OK', false, null, true) })">Flush Cache</button>
+                   <button class="dev-btn-sm" onclick="showConfirm('Flush Cache', 'Are you sure you want to flush all system caches?', 'Flush', false, () => { showConfirm('Success', 'All caches purged successfully!', 'OK', false, null, true) })"><i data-lucide="trash" style="width:14px;height:14px;"></i> Flush Cache</button>
                 </div>
-             </div>
-             
-             <div class="dashboard-card">
-                <h4 style="margin: 0 0 10px 0; color: var(--text-primary);">Discord Integration</h4>
-                <p style="margin-top:0; font-size: 13px; color: var(--text-secondary);">Update the active Discord server invite link.</p>
-                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                   <input type="text" id="devDiscordLink" value="{{ discord_link }}" class="dev-select" style="flex: 1; min-width: 200px; padding: 10px;" placeholder="https://discord.gg/..." />
-                   <button class="dev-btn-sm" onclick="adminUpdateDiscordLink()">Save Link</button>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px;">
+                   <input type="text" id="devDiscordLink" value="{{ discord_link }}" class="dev-select" style="flex: 1; min-width: 200px; padding: 10px;" placeholder="Discord Link" />
+                   <button class="dev-btn-sm" onclick="adminUpdateDiscordLink()"><i data-lucide="save" style="width:14px;height:14px;"></i> Save Link</button>
                 </div>
              </div>
 
              <div class="dashboard-card">
-                <h4 style="margin: 0 0 10px 0; color: var(--text-primary);">Live System Console</h4>
+                <h4 style="margin: 0 0 10px 0; color: var(--text-primary); display:flex; align-items:center; gap:8px;"><i data-lucide="terminal" style="width:18px;height:18px;"></i> Live System Console</h4>
                 <div class="web-console" id="webConsoleBox"></div>
              </div>
           </div>
         </div>
         
         <div class="tab-content" id="tab-discord">
-          <h2 data-i18n="c_tit">Community</h2>
+          <h2 data-i18n="c_tit"><i data-lucide="message-square" style="width:28px; height:28px;"></i> Community</h2>
           <div class="dashboard-card discord-card">
             <svg width="64" height="64" viewBox="0 0 127.14 96.36" fill="#5865F2"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.31,60,73.31,53s5-12.74,11.43-12.74S96.2,46,96.09,53,91.08,65.69,84.69,65.69Z"/></svg>
             <h3 style="margin: 0; font-size: 24px; color: var(--text-primary);" data-i18n="disc_club">Global Scripts Club</h3>
@@ -634,6 +677,20 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
   </div>
 
 <script>
+  // Безопасная загрузка иконок (защита от краша, если интернет или CDN заблокированы)
+  function updateIcons() {
+      if (typeof lucide !== 'undefined') { lucide.createIcons(); }
+  }
+  
+  // Инициализация при первой загрузке
+  document.addEventListener("DOMContentLoaded", function() {
+      setTimeout(updateIcons, 100);
+  });
+
+  // Глобальное хранилище данных для предотвращения ошибок с кавычками
+  window.userScriptsData = {};
+  window.adminScriptsData = {};
+
   const i18n = {
     en: { theme_btn: "Light Mode", logout: "Logout", auth_btn: "AUTHORIZE", no_acc: "Don't have an account? Create it!", dev_auth: "Developer Authentication", dev_desc: "Enter secret codename.", unlock_btn: "UNLOCK MAINFRAME", cancel: "Cancel", bot_prot: "Bot Protection", bot_desc: "Check your email.", verify_btn: "VERIFY", reg_desc: "Describe yourself.", agree: "I agree to privacy cookies", create_btn: "CREATE ACCOUNT", back_login: "Back to Login", loading: "Authenticating System...", menu: "MENU", m_main: "MAIN", m_main_d: "Your main profile", m_key: "KEY SYSTEM", m_key_d: "Get a key", m_scr: "SCRIPTS", m_scr_d: "Game scripts", m_plan: "PLANS", m_plan_d: "Buy plans", m_faq: "FAQ", m_faq_d: "Got questions?", m_dev: "DEVELOPERS", m_dev_d: "Admin Panel", m_disc: "DISCORD", m_disc_d: "Join us", u_prof: "User Profile", acc_det: "Account Details", acc_det_d: "Your personal overview.", l_login: "LOGIN", l_plan: "CURRENT PLAN", l_reg: "REGISTRATION", l_dev: "DEV APPROVED", k_gen: "Key Generator", k_unl: "Unlock Free Access", k_desc: "Generate keys (12h). 1 per day.", k_btn: "Generate New Key", s_lib: "Scripts Library", s_good: "Good script in beta.", s_copy: "COPY LUA SCRIPT", p_upg: "Upgrade Plans", p_buy: "Buy Plan", p_my: "My Current Plan", p_start: "Starter Plan", p_start_d: "Little access.", p_pro: "Professional Plan", p_pro_d: "More access.", p_ext: "Extreme Plan", p_ext_d: "All access.", p_purch: "Purchase", p_desc: "Features unlocked.", p_rest: "Restart Plan", p_del: "Delete Account", p_sup: "Contact Support", f_tit: "FAQ & Support", f_desc: "Got questions? We answer fast!", d_tit: "Developers", d_desc: "Mainframe architecture.", c_tit: "Community", c_desc: "Join Discord.", fr_tit: "Account frozen", fr_desc: "Contact dev.", mn_tit: "Site Maintenance", mn_desc: "Try again later.", login_ph: "Login", pass_ph: "Password", secret_ph: "Secret Word", code_ph: "Code", email_ph: "Email", reg_sec_ph: "Secret recovery word", reg_src_ph: "How did you hear about us?", m_cancel: "Cancel", m_confirm: "Confirm", disc_club: "Global Scripts Club", disc_desc: "Join to follow updates and chat!", disc_join: "Join the Club", captcha_ph: "Answer", r_tit: "Congratulations!", r_sub: "You received:", r_dev: "Developer: ", r_btn: "Okay!", prompt_msg: "Message for user:", r_hist: "Receipts History", r_hist_btn: "Receipts", t_reason_ph: "Reason for support...", t_norm: "Normal Speed", t_fast: "Fast Response", t_send: "Send Support Request", t_suc_tit: "Request Created!", t_suc_desc: "Ticket submitted to developers.", t_msg_ph: "Type message...", t_reply: "Send", t_close: "Close Ticket", t_show_all: "Show All" },
     ru: { theme_btn: "Светлая тема", logout: "Выйти", auth_btn: "АВТОРИЗАЦИЯ", no_acc: "Нет аккаунта? Создайте!", dev_auth: "Проверка", dev_desc: "Секретный код.", unlock_btn: "РАЗБЛОКИРОВАТЬ", cancel: "Отмена", bot_prot: "Защита", bot_desc: "Код на почте.", verify_btn: "ПОДТВЕРДИТЬ", reg_desc: "Создание аккаунта.", agree: "Согласен с правилами", create_btn: "СОЗДАТЬ", back_login: "Назад", loading: "Загрузка...", menu: "МЕНЮ", m_main: "ГЛАВНАЯ", m_main_d: "Профиль", m_key: "КЛЮЧИ", m_key_d: "Получить доступ", m_scr: "СКРИПТЫ", m_scr_d: "Игровые скрипты", m_plan: "ПЛАНЫ", m_plan_d: "Купить", m_faq: "FAQ", m_faq_d: "Вопросы?", m_dev: "АДМИНКА", m_dev_d: "Управление", m_disc: "DISCORD", m_disc_d: "Чат", u_prof: "Профиль", acc_det: "Детали", acc_det_d: "Информация в системе.", l_login: "ЛОГИН", l_plan: "ПЛАН", l_reg: "ДАТА РЕГИСТРАЦИИ", l_dev: "АДМИН", k_gen: "Генератор", k_unl: "Доступ", k_desc: "Ключи на 12ч (раз в 24ч).", k_btn: "Сгенерировать", s_lib: "Скрипты", s_good: "Скрипт в бете.", s_copy: "КОПИРОВАТЬ LUA", p_upg: "Планы", p_buy: "Купить", p_my: "Мой План", p_start: "Начальный", p_start_d: "Для новичков.", p_pro: "Про-План", p_pro_d: "Больше функций.", p_ext: "Экстремальный", p_ext_d: "Всё включено.", p_purch: "Купить", p_desc: "Функции активны.", p_rest: "Перезапустить", p_del: "Удалить Аккаунт", p_sup: "Поддержка", f_tit: "FAQ и Поддержка", f_desc: "Есть вопросы? Ответим быстро!", d_tit: "Разработчики", d_desc: "Панель управления.", c_tit: "Комьюнити", c_desc: "Дискорд сервер.", fr_tit: "Аккаунт заморожен", fr_desc: "Пиши админу.", mn_tit: "Тех. работы", mn_desc: "Зайди позже.", login_ph: "Логин", pass_ph: "Пароль", secret_ph: "Секрет", code_ph: "Код", email_ph: "Почта", reg_sec_ph: "Секретное слово", reg_src_ph: "Откуда узнали?", m_cancel: "Отмена", m_confirm: "Подтвердить", disc_club: "Global Scripts Club", disc_desc: "Заходи, общайся, следи за апдейтами!", disc_join: "Зайти в клуб", captcha_ph: "Ответ", r_tit: "Поздравляем!", r_sub: "Вы получили от разработчика:", r_dev: "Разработчик: ", r_btn: "Хорошо!", prompt_msg: "Сообщение юзеру:", r_hist: "История Чеков", r_hist_btn: "Чеки", t_reason_ph: "Причина вызова поддержки...", t_norm: "Обычно", t_fast: "Быстро", t_send: "Отправить запрос", t_suc_tit: "Успешно!", t_suc_desc: "Запрос отправлен разработчикам.", t_msg_ph: "Сообщение...", t_reply: "Отправить", t_close: "Закрыть тикет", t_show_all: "Открыть все" },
@@ -740,7 +797,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
   function refreshAdminData() {
      fetch('/admin/get_users').then(res => res.json()).then(data => {
         if(data.success) {
-           document.getElementById('btnToggleMaintenance').innerText = data.maintenance === 'Yes' ? "Turn Site ON" : "Turn Site OFF (Maintenance)";
+           document.getElementById('btnToggleMaintenance').innerHTML = data.maintenance === 'Yes' ? `<i data-lucide="power" style="width:14px;height:14px;"></i> Turn Site ON` : `<i data-lucide="power-off" style="width:14px;height:14px;"></i> Turn Site OFF (Maintenance)`;
            document.getElementById('btnToggleMaintenance').className = data.maintenance === 'Yes' ? "dev-btn-sm dev-btn-danger" : "dev-btn-sm";
            const tbody = document.getElementById('devUsersTableBody'); tbody.innerHTML = '';
            data.users.forEach(u => {
@@ -748,10 +805,160 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
               const freezeClass = u.is_frozen === 'Yes' ? 'dev-btn-sm dev-btn-danger' : 'dev-btn-sm dev-btn-freeze';
               tbody.innerHTML += `<tr><td><b>${u.login}</b></td><td>${u.plan}</td><td>${u.plan_days} d</td><td><select class="dev-select" onchange="promptAdminChangePlan('${u.login}', this.value)"><option value="" selected disabled>Select plan</option><option value="Starter Plan">Starter</option><option value="Professional Plan">Professional</option><option value="Extreme Plan">Extreme</option></select></td><td><div style="display:flex; gap:8px;"><button class="dev-btn-sm" onclick="promptAdminAddDays('${u.login}')">+7 Days</button><button class="${freezeClass}" onclick="adminToggleFreeze('${u.login}')">${freezeText}</button><button class="dev-btn-sm dev-btn-danger" onclick="requestAdminDeleteUser('${u.login}')">Delete</button></div></td></tr>`;
            });
+           updateIcons();
         }
      }).catch(e => console.error(e));
      pollAdminTickets();
+     loadAdminScripts(); 
   }
+
+  // --- СИСТЕМА УПРАВЛЕНИЯ СКРИПТАМИ (БЕЗОПАСНАЯ) ---
+  function loadUserScripts() {
+      fetch('/api/get_scripts').then(res=>res.json()).then(data=>{
+          const container = document.getElementById('userScriptsContainer');
+          container.innerHTML = '';
+          if(data.scripts.length === 0) {
+              container.innerHTML = '<p style="color:var(--text-secondary);">No scripts available at the moment.</p>';
+              return;
+          }
+          
+          let now = new Date().getTime();
+          window.userScriptsData = {}; // Очищаем старые данные
+          
+          data.scripts.forEach(s => {
+              let releaseTime = new Date(s.release_date).getTime();
+              let isLocked = releaseTime > now;
+              
+              // СОХРАНЯЕМ КОД В ГЛОБАЛЬНЫЙ МАССИВ (БЕЗ ВСТАВКИ В HTML)
+              window.userScriptsData[s.id] = s.script_code;
+              
+              let btnHtml = '';
+              if (isLocked) {
+                  let dateStr = new Date(s.release_date).toLocaleString();
+                  btnHtml = `<button class="copy-btn" disabled><i data-lucide="lock" style="width:16px;height:16px;"></i> Unlocks: ${dateStr}</button>`;
+              } else {
+                  // ПЕРЕДАЕМ ТОЛЬКО ID (Безопасно!)
+                  btnHtml = `<button class="copy-btn" onclick="copyDynamicScript(this, ${s.id})" data-i18n="s_copy"><i data-lucide="copy" style="width:16px;height:16px;"></i> COPY LUA SCRIPT</button>`;
+              }
+              
+              container.innerHTML += `
+              <div class="script-card">
+                <div class="script-banner" style="background-image: url('${s.banner_url}');">
+                </div>
+                <div class="script-content">
+                  <div class="script-header">
+                      <h3>${s.title}</h3>
+                      <span class="game-tag">for game: ${s.game}</span>
+                  </div>
+                  <p class="script-desc">${s.description}</p>
+                  ${btnHtml}
+                </div>
+              </div>`;
+          });
+          updateIcons();
+      });
+  }
+
+  function loadAdminScripts() {
+      fetch('/api/get_scripts?admin=true').then(res=>res.json()).then(data=>{
+          const tbody = document.getElementById('devScriptsTableBody');
+          tbody.innerHTML = '';
+          window.adminScriptsData = {}; // Очищаем старые данные
+          
+          data.scripts.forEach(s => {
+              // СОХРАНЯЕМ ОБЪЕКТ В ГЛОБАЛЬНЫЙ МАССИВ (БЕЗ ВСТАВКИ В HTML)
+              window.adminScriptsData[s.id] = s;
+              
+              let f_icon = s.is_frozen === 'Yes' ? 'snowflake' : 'pause';
+              let f_color = s.is_frozen === 'Yes' ? 'dev-btn-danger' : '';
+
+              tbody.innerHTML += `
+              <tr style="opacity: ${s.is_frozen === 'Yes' ? '0.5' : '1'}">
+                  <td><b>${s.title}</b></td>
+                  <td>${s.game}</td>
+                  <td>${s.release_date}</td>
+                  <td>
+                      <div style="display:flex; gap:8px;">
+                          <!-- ПЕРЕДАЕМ ТОЛЬКО ID (Безопасно!) -->
+                          <button class="dev-btn-sm" onclick="editAdminScript(${s.id})"><i data-lucide="edit-3" style="width:14px;height:14px;"></i></button>
+                          <button class="dev-btn-sm ${f_color}" onclick="toggleFreezeScript(${s.id})"><i data-lucide="${f_icon}" style="width:14px;height:14px;"></i></button>
+                          <button class="dev-btn-sm dev-btn-danger" onclick="deleteScript(${s.id})"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>
+                      </div>
+                  </td>
+              </tr>`;
+          });
+          updateIcons();
+      });
+  }
+
+  function editAdminScript(id) {
+      const s = window.adminScriptsData[id];
+      if (!s) return;
+      document.getElementById('devScriptId').value = s.id;
+      document.getElementById('devScriptTitle').value = s.title;
+      document.getElementById('devScriptGame').value = s.game;
+      document.getElementById('devScriptBanner').value = s.banner_url;
+      document.getElementById('devScriptDate').value = s.release_date;
+      document.getElementById('devScriptCode').value = s.script_code;
+      document.getElementById('devScriptDesc').value = s.description;
+  }
+
+  function copyDynamicScript(btn, id) {
+    const finalCode = window.userScriptsData[id];
+    if (!finalCode) return;
+    navigator.clipboard.writeText(finalCode).then(() => {
+      const originalHtml = btn.innerHTML; 
+      btn.innerHTML = '<i data-lucide="check" style="width:16px;height:16px;"></i> Copied!'; 
+      btn.style.backgroundColor = 'var(--success)'; btn.style.color = '#fff';
+      updateIcons();
+      setTimeout(() => { btn.innerHTML = originalHtml; btn.style.backgroundColor = ''; btn.style.color = ''; updateIcons(); }, 2000);
+    });
+  }
+
+  function saveAdminScript() {
+      const id = document.getElementById('devScriptId').value;
+      const title = document.getElementById('devScriptTitle').value.trim();
+      const game = document.getElementById('devScriptGame').value.trim();
+      const banner = document.getElementById('devScriptBanner').value.trim();
+      const date = document.getElementById('devScriptDate').value;
+      const code = document.getElementById('devScriptCode').value.trim();
+      const desc = document.getElementById('devScriptDesc').value.trim();
+      
+      if(!title || !game || !banner || !date || !code || !desc) {
+          showConfirm('Error', 'Please fill all script fields!', 'OK', false, null, true);
+          return;
+      }
+      
+      fetch('/admin/save_script', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({id, title, game, banner_url: banner, release_date: date, script_code: code, description: desc})
+      }).then(res=>res.json()).then(data=>{
+          if(data.success) { clearScriptForm(); loadAdminScripts(); loadUserScripts(); }
+      });
+  }
+
+  function clearScriptForm() {
+      document.getElementById('devScriptId').value = '';
+      document.getElementById('devScriptTitle').value = '';
+      document.getElementById('devScriptGame').value = '';
+      document.getElementById('devScriptBanner').value = '';
+      document.getElementById('devScriptDate').value = '';
+      document.getElementById('devScriptCode').value = '';
+      document.getElementById('devScriptDesc').value = '';
+  }
+
+  function toggleFreezeScript(id) {
+      fetch('/admin/freeze_script', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id}) })
+      .then(res=>res.json()).then(data => { if(data.success){ loadAdminScripts(); loadUserScripts(); } });
+  }
+
+  function deleteScript(id) {
+      showConfirm('Delete Script', 'Are you sure you want to permanently delete this script?', 'Delete', true, () => {
+          fetch('/admin/delete_script', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id}) })
+          .then(res=>res.json()).then(data => { if(data.success){ loadAdminScripts(); loadUserScripts(); } });
+      });
+  }
+  // ------------------------------------
 
   function submitUserTicket() {
       const reason = document.getElementById('uTicketReason').value.trim();
@@ -804,19 +1011,20 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
           for(let i=0; i<count; i++) {
               let t = tix[i];
               let cl = t.status === 'closed' ? 'ticket-item closed' : (t.id === activeTicketId ? 'ticket-item active' : 'ticket-item');
-              let mark = t.status === 'closed' ? '✔️' : '❗️';
-              let btns = t.status === 'pending' ? `<button class="dev-btn-sm" style="background:var(--success); color:#fff; border:none;" onclick="actionTicket(${t.id}, 'accept')">Accept</button><button class="dev-btn-sm dev-btn-danger" onclick="actionTicket(${t.id}, 'reject')">Reject</button>` : `<button class="dev-btn-sm" onclick="openAdminChat(${t.id}, '${t.user_login}')">Open Chat</button>`;
+              let mark = t.status === 'closed' ? '<i data-lucide="check-circle" style="color:var(--success);"></i>' : '<i data-lucide="alert-circle" style="color:#ff9f0a;"></i>';
+              let btns = t.status === 'pending' ? `<button class="dev-btn-sm" style="background:var(--success); color:#fff; border:none;" onclick="actionTicket(${t.id}, 'accept')"><i data-lucide="check" style="width:14px;height:14px;"></i></button><button class="dev-btn-sm dev-btn-danger" onclick="actionTicket(${t.id}, 'reject')"><i data-lucide="x" style="width:14px;height:14px;"></i></button>` : `<button class="dev-btn-sm" onclick="openAdminChat(${t.id}, '${t.user_login}')"><i data-lucide="message-circle" style="width:14px;height:14px;"></i> Chat</button>`;
               
               if(t.status === 'closed') btns = `<span style="opacity:0.5;">Resolved</span>`;
               
               cont.innerHTML += `<div class="${cl}">
                   <div style="display:flex; align-items:center;">
-                      <span class="ticket-icon">${mark}</span>
+                      <span class="ticket-icon" style="margin-right:10px;">${mark}</span>
                       <div><b>${t.user_login}</b> <span style="opacity:0.5; font-size:11px;">[${t.priority}]</span><br><span style="font-size:12px;">${t.reason}</span></div>
                   </div>
                   <div style="display:flex; gap:6px;">${btns}</div>
               </div>`;
           }
+          updateIcons();
           if(activeTicketId) updateAdminChat(activeTicketId);
       });
   }
@@ -905,14 +1113,6 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
       });
   }
 
-  function copyLuaScript(btn) {
-    const luaCode = 'loadstring(game:HttpGet("https://raw.githubusercontent.com/Rob4ik02/Muscle-Legends-Roblox/refs/heads/main/Muscle%20Legends/Sirius%20Library/Loader.lua"))()';
-    navigator.clipboard.writeText(luaCode).then(() => {
-      const originalText = btn.innerText; btn.innerText = 'Copied successfully!'; btn.style.backgroundColor = 'var(--success)'; btn.style.color = '#fff';
-      setTimeout(() => { btn.innerText = originalText; btn.style.backgroundColor = ''; btn.style.color = ''; }, 2000);
-    });
-  }
-
   function closeRewardScreen() {
       fetch('/api/clear_reward', { method: 'POST' }).then(() => { document.getElementById('rewardScreen').style.display = 'none'; });
   }
@@ -963,6 +1163,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
     globalSpeedBoost = 30; sidebarBtns.forEach(b => b.classList.remove('active')); tabContents.forEach(t => t.classList.remove('active'));
     sidebarBtns.forEach(b => { if(b.getAttribute('data-target') === targetId) b.classList.add('active'); }); document.getElementById(targetId).classList.add('active');
     if(targetId === 'tab-faq' && !document.getElementById('userTicketChatCard').style.display.includes('none')) { checkUserTicketState(); }
+    if(targetId === 'tab-scripts') { loadUserScripts(); }
   }
   sidebarBtns.forEach(btn => btn.addEventListener('click', () => switchTab(btn.getAttribute('data-target'))));
   document.getElementById('userDisplay').addEventListener('click', () => switchTab('tab-main'));
@@ -1015,8 +1216,13 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
                     document.getElementById('rewardValue').innerText = valText; document.getElementById('rewardMessage').innerText = rMsg; document.getElementById('rewardScreen').style.display = 'flex';
                 }
                 if(data.active_key) { document.getElementById('generatedKeyDisplay').innerText = data.active_key; document.getElementById('generatedKeyDisplay').style.display = 'block'; }
-                document.getElementById('userDisplay').innerText = data.login; document.getElementById('profileLogin').innerText = data.login; document.getElementById('profilePlan').innerText = data.plan; document.getElementById('profileRegDate').innerText = data.reg_date; document.getElementById('profileDevApproved').innerText = data.dev_approved; document.getElementById('planCurrentStatus').innerText = "Your current plan: " + data.plan + " - " + data.plan_days + " Days";
+                document.getElementById('userDisplay').innerHTML = `<i data-lucide="user" style="width:14px; height:14px;"></i> <span id="userLoginText">${data.login}</span>`;
+                document.getElementById('profileLogin').innerText = data.login; document.getElementById('profilePlan').innerText = data.plan; document.getElementById('profileRegDate').innerText = data.reg_date; document.getElementById('profileDevApproved').innerText = data.dev_approved; document.getElementById('planCurrentStatus').innerText = "Your current plan: " + data.plan + " - " + data.plan_days + " Days";
+                
+                loadUserScripts(); // Загрузка скриптов юзера
+
                 loadAdminPanel(data.dev_approved); setInterval(checkUserTicketState, 5000); checkUserTicketState();
+                updateIcons();
             }
         });
     }
@@ -1359,7 +1565,79 @@ def get_messages():
     conn.close()
     return jsonify({'messages': [dict(m) for m in messages]})
 
-# --- АДМИНКА ---
+# --- АПИ СКРИПТОВ ---
+@app.route('/api/get_scripts', methods=['GET'])
+def get_scripts():
+    is_admin_request = request.args.get('admin') == 'true'
+    current_user = session.get('user')
+    
+    conn = get_db_connection()
+    if is_admin_request:
+        check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
+        if not check or check['dev_approved'] != 'Yes': 
+            conn.close()
+            return jsonify({'success': False}), 403
+        scripts = conn.execute("SELECT * FROM scripts ORDER BY id DESC").fetchall()
+    else:
+        scripts = conn.execute("SELECT * FROM scripts WHERE is_frozen = 'No' ORDER BY id DESC").fetchall()
+    conn.close()
+    
+    return jsonify({'success': True, 'scripts': [dict(s) for s in scripts]})
+
+@app.route('/admin/save_script', methods=['POST'])
+def save_script():
+    current_user = session.get('user')
+    conn = get_db_connection()
+    check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
+    if not check or check['dev_approved'] != 'Yes': 
+        conn.close(); return jsonify({'success': False}), 403
+        
+    data = request.get_json()
+    s_id = data.get('id')
+    title = data.get('title')
+    game = data.get('game')
+    banner = data.get('banner_url')
+    r_date = data.get('release_date')
+    code = data.get('script_code')
+    desc = data.get('description')
+    
+    if s_id:
+        conn.execute('''UPDATE scripts SET title=?, game=?, banner_url=?, release_date=?, script_code=?, description=? WHERE id=?''',
+                     (title, game, banner, r_date, code, desc, s_id))
+    else:
+        conn.execute('''INSERT INTO scripts (title, game, banner_url, release_date, script_code, description) VALUES (?, ?, ?, ?, ?, ?)''',
+                     (title, game, banner, r_date, code, desc))
+    conn.commit(); conn.close()
+    return jsonify({'success': True})
+
+@app.route('/admin/freeze_script', methods=['POST'])
+def freeze_script():
+    current_user = session.get('user')
+    conn = get_db_connection()
+    check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
+    if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
+        
+    s_id = request.get_json().get('id')
+    target = conn.execute("SELECT is_frozen FROM scripts WHERE id = ?", (s_id,)).fetchone()
+    new_status = 'No' if target['is_frozen'] == 'Yes' else 'Yes'
+    conn.execute("UPDATE scripts SET is_frozen = ? WHERE id = ?", (new_status, s_id))
+    conn.commit(); conn.close()
+    return jsonify({'success': True})
+
+@app.route('/admin/delete_script', methods=['POST'])
+def delete_script():
+    current_user = session.get('user')
+    conn = get_db_connection()
+    check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
+    if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
+        
+    s_id = request.get_json().get('id')
+    conn.execute("DELETE FROM scripts WHERE id = ?", (s_id,))
+    conn.commit(); conn.close()
+    return jsonify({'success': True})
+
+
+# --- АДМИНКА (ПРОЧЕЕ) ---
 @app.route('/admin/get_users')
 def admin_get_users():
     current_user = session.get('user')
@@ -1492,19 +1770,15 @@ def create_payment():
     data = request.get_json(); plan_name = data.get('plan')
     amount = 150 if 'Starter' in plan_name else (350 if 'Professional' in plan_name else 700)
     
-    # Генерация ID заказа
     pay_id = f"{int(time.time())}{random.randint(10,99)}"
     desc = f"Payment for {plan_name}"
     currency = "RUB"
     
-    # Записываем платеж в ожидающие
     conn = get_db_connection()
     conn.execute("INSERT INTO pending_payments (pay_id, user_login, plan, amount) VALUES (?, ?, ?, ?)", (pay_id, current_user, plan_name, amount))
     conn.commit()
     conn.close()
 
-    # ССЫЛКА НА ОПЛАТУ ЧЕРЕЗ ANYPAY.IO
-    # (Здесь используется MD5 подпись: merchant_id:amount:pay_id:currency:desc:secret_key_1)
     sign_string = f"{ANYPAY_MERCHANT_ID}:{amount}:{pay_id}:{currency}:{desc}:{ANYPAY_SECRET_KEY_1}"
     sign = hashlib.md5(sign_string.encode('utf-8')).hexdigest()
     
@@ -1591,14 +1865,12 @@ def logout():
     session.pop('user', None)
     return ('', 204)
 
-# =================================================================
-# --- ANYPAY ВЕРИФИКАЦИЯ (ИМЯ ФАЙЛА И МАРШРУТ) ---
-# =================================================================
 @app.route('/anypay-verification.txt')
-@app.route('/7641a6b9610252ee169f2815a5c2')
+@app.route('/7641a8b9610252ee169f2815a5c2.txt')
 def anypay_txt_verify():
-    return "7641a6b9610252ee169f2815a5c2", 200, {'Content-Type': 'text/plain'}
+    # Возвращаем чистый текст для бота AnyPay
+    return "7641a8b9610252ee169f2815a5c2", 200, {'Content-Type': 'text/plain'}
+
 if __name__ == '__main__':
-    
     c_log('SERVICE', "Starting production server on port 5000...")
     app.run(debug=True)
