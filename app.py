@@ -141,6 +141,8 @@ TEMPLATE = '''
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="anypay-verification" content="7641a8b9610252ee169f2815a5c2" />
 <title>Global Script's Hub</title>
+<!-- ФАВИКОНКА -->
+<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/Rob4ik02/Global-Scripts-Development/refs/heads/main/Icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
 <style>
@@ -173,7 +175,10 @@ TEMPLATE = '''
 
 * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
 html, body { height: 100%; min-height: 100vh; margin: 0; padding: 0; }
-body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-primary); transition: background-color 0.6s ease, color 0.6s ease; overflow-x: hidden; overflow-y: auto; background-attachment: fixed; perspective: 1000px; }
+
+/* АНТИ-КРАЖА: ЗАПРЕТ ВЫДЕЛЕНИЯ ТЕКСТА */
+body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-primary); transition: background-color 0.6s ease, color 0.6s ease; overflow-x: hidden; overflow-y: auto; background-attachment: fixed; perspective: 1000px; user-select: none; -webkit-user-select: none; }
+input, textarea, .web-console, .chat-msg { user-select: text; -webkit-user-select: text; }
 
 /* -------------------------------------
    DRAGON INTRO (Неоновая длинная сосиска)
@@ -216,7 +221,7 @@ button { position: relative; overflow: hidden; }
 .landing-hero p { font-size: 20px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 40px; }
 .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; width: 100%; max-width: 1100px; margin-bottom: 60px; perspective: 1200px; }
 
-/* 3D Glassmorphism Cards - Фиксируем базовое состояние, чтобы не дергались */
+/* 3D Glassmorphism Cards - Фиксируем базовое состояние */
 .feature-box, .script-card, .plan-card, .dashboard-card {
     background: var(--card-bg);
     backdrop-filter: var(--blur);
@@ -419,22 +424,22 @@ button { position: relative; overflow: hidden; }
   <!-- LANDING PREVIEW (Презентация) -->
   <div id="landingWrapper">
     <div class="landing-hero">
-      <h1>Dive in, ride with Global Scripts</h1>
-      <p>Experience the next generation of script execution. Packed with power, built for stability, and designed for you. Join the elite community today.</p>
-      <button class="login-to-start-btn" onclick="enterAppFromLanding()">LOGIN TO START</button>
+      <h1 data-i18n="l_title">Dive in, ride with Global Scripts</h1>
+      <p data-i18n="l_sub">Experience the next generation of script execution. Packed with power, built for stability, and designed for you. Join the elite community today.</p>
+      <button class="login-to-start-btn" onclick="enterAppFromLanding()" data-i18n="l_btn">LOGIN TO START</button>
     </div>
     <div class="feature-grid">
       <div class="feature-box">
-        <h3><i data-lucide="zap" style="color:var(--success);"></i> Lightning Fast</h3>
-        <p>Blazing fast script execution with virtually zero delay and optimized memory usage.</p>
+        <h3><i data-lucide="zap" style="color:var(--success);"></i> <span data-i18n="f_fast">Lightning Fast</span></h3>
+        <p data-i18n="f_fast_d">Blazing fast script execution with virtually zero delay and optimized memory usage.</p>
       </div>
       <div class="feature-box">
-        <h3><i data-lucide="shield-check" style="color:#0abfff;"></i> Crash Resistant</h3>
-        <p>Tested interface and advanced stability protocols built by veteran developers.</p>
+        <h3><i data-lucide="shield-check" style="color:#0abfff;"></i> <span data-i18n="f_crash">Crash Resistant</span></h3>
+        <p data-i18n="f_crash_d">Tested interface and advanced stability protocols built by veteran developers.</p>
       </div>
       <div class="feature-box">
-        <h3><i data-lucide="cloud" style="color:#ff9f0a;"></i> Cloud Hub</h3>
-        <p>Instant access to a massive verified database of scripts for all popular games.</p>
+        <h3><i data-lucide="cloud" style="color:#ff9f0a;"></i> <span data-i18n="f_cloud">Cloud Hub</span></h3>
+        <p data-i18n="f_cloud_d">Instant access to a massive verified database of scripts for all popular games.</p>
       </div>
     </div>
   </div>
@@ -526,7 +531,7 @@ button { position: relative; overflow: hidden; }
 
   <div class="app-content" id="appMainWrapper">
     <div class="header" id="mainHeader">
-      <img src="https://raw.githubusercontent.com/Rob4ik02/RobloxScripts/refs/heads/main/icon.png" alt="" />
+      <img src="https://raw.githubusercontent.com/Rob4ik02/Global-Scripts-Development/refs/heads/main/Icon.png" alt="" />
       <h1>Global Script's</h1>
     </div>
 
@@ -783,13 +788,18 @@ button { position: relative; overflow: hidden; }
   </div>
 
 <script>
+  // АНТИ-КРАЖА СКРИПТОВ (Отключение консоли и выделения)
+  document.addEventListener('contextmenu', event => event.preventDefault());
+  document.addEventListener('keydown', (e) => {
+      if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key)) || (e.ctrlKey && e.key === 'U')) {
+          e.preventDefault();
+      }
+  });
+
+  // ЗАГРУЗКА ИКОНОК
   function updateIcons() {
       if (typeof lucide !== 'undefined') { lucide.createIcons(); }
   }
-  
-  document.addEventListener("DOMContentLoaded", function() {
-      setTimeout(updateIcons, 100);
-  });
 
   function initTiltEffect() {
       const cards = document.querySelectorAll('.feature-box:not(.tilt-applied), .script-card:not(.tilt-applied), .plan-card:not(.tilt-applied), .dashboard-card:not(.tilt-applied)');
@@ -847,21 +857,6 @@ button { position: relative; overflow: hidden; }
 
   let globalWarpSpeedY = 0;
 
-  window.addEventListener('DOMContentLoaded', () => {
-      setTimeout(() => {
-          const intro = document.getElementById('introOverlay');
-          if(intro) {
-              intro.style.opacity = '0';
-              setTimeout(() => {
-                  intro.style.display = 'none';
-                  document.getElementById('landingWrapper').style.display = 'flex';
-                  updateIcons();
-                  initTiltEffect();
-              }, 800);
-          }
-      }, 2000); 
-  });
-
   function enterAppFromLanding() {
       const landing = document.getElementById('landingWrapper');
       landing.style.opacity = '0';
@@ -885,10 +880,128 @@ button { position: relative; overflow: hidden; }
   window.adminScriptsData = {};
 
   const i18n = {
-    en: { theme_btn: "Light Mode", logout: "Logout", auth_btn: "AUTHORIZE", no_acc: "Don't have an account? Create it!", dev_auth: "Developer Authentication", dev_desc: "Enter secret codename.", unlock_btn: "UNLOCK MAINFRAME", cancel: "Cancel", bot_prot: "Bot Protection", bot_desc: "Check your email.", verify_btn: "VERIFY", reg_desc: "Describe yourself.", agree: "I agree to privacy cookies", create_btn: "CREATE ACCOUNT", back_login: "Back to Login", loading: "Authenticating System...", menu: "MENU", m_main: "MAIN", m_main_d: "Your main profile", m_key: "KEY SYSTEM", m_key_d: "Get a key", m_scr: "SCRIPTS", m_scr_d: "Game scripts", m_plan: "PLANS", m_plan_d: "Buy plans", m_faq: "FAQ", m_faq_d: "Got questions?", m_dev: "DEVELOPERS", m_dev_d: "Admin Panel", m_disc: "DISCORD", m_disc_d: "Join us", u_prof: "User Profile", acc_det: "Account Details", acc_det_d: "Your personal overview.", l_login: "LOGIN", l_plan: "CURRENT PLAN", l_reg: "REGISTRATION", l_dev: "DEV APPROVED", k_gen: "Key Generator", k_unl: "Unlock Free Access", k_desc: "Generate keys (12h). 1 per day.", k_btn: "Generate New Key", s_lib: "Scripts Library", s_good: "Good script in beta.", s_copy: "COPY LUA SCRIPT", p_upg: "Upgrade Plans", p_buy: "Buy Plan", p_my: "My Current Plan", p_start: "Starter Plan", p_start_d: "Little access.", p_pro: "Professional Plan", p_pro_d: "More access.", p_ext: "Extreme Plan", p_ext_d: "All access.", p_purch: "Purchase", p_desc: "Features unlocked.", p_rest: "Restart Plan", p_del: "Delete Account", p_sup: "Contact Support", f_tit: "FAQ & Support", f_desc: "Got questions? We answer fast!", d_tit: "Developers", d_desc: "Mainframe architecture.", c_tit: "Community", c_desc: "Join Discord.", fr_tit: "Account frozen", fr_desc: "Contact dev.", mn_tit: "Site Maintenance", mn_desc: "Try again later.", login_ph: "Login", pass_ph: "Password", secret_ph: "Secret Word", code_ph: "Code", email_ph: "Email", reg_sec_ph: "Secret recovery word", reg_src_ph: "How did you hear about us?", m_cancel: "Cancel", m_confirm: "Confirm", disc_club: "Global Scripts Club", disc_desc: "Join to follow updates and chat!", disc_join: "Join the Club", captcha_ph: "Answer", r_tit: "Congratulations!", r_sub: "You received:", r_dev: "Developer: ", r_btn: "Okay!", prompt_msg: "Message for user:", r_hist: "Receipts History", r_hist_btn: "Receipts", t_reason_ph: "Reason for support...", t_norm: "Normal Speed", t_fast: "Fast Response", t_send: "Send Support Request", t_suc_tit: "Request Created!", t_suc_desc: "Ticket submitted to developers.", t_msg_ph: "Type message...", t_reply: "Send", t_close: "Close Ticket", t_show_all: "Show All" },
-    ru: { theme_btn: "Светлая тема", logout: "Выйти", auth_btn: "АВТОРИЗАЦИЯ", no_acc: "Нет аккаунта? Создайте!", dev_auth: "Проверка", dev_desc: "Секретный код.", unlock_btn: "РАЗБЛОКИРОВАТЬ", cancel: "Отмена", bot_prot: "Защита", bot_desc: "Код на почте.", verify_btn: "ПОДТВЕРДИТЬ", reg_desc: "Создание аккаунта.", agree: "Согласен с правилами", create_btn: "СОЗДАТЬ", back_login: "Назад", loading: "Загрузка...", menu: "МЕНЮ", m_main: "ГЛАВНАЯ", m_main_d: "Профиль", m_key: "КЛЮЧИ", m_key_d: "Получить доступ", m_scr: "СКРИПТЫ", m_scr_d: "Игровые скрипты", m_plan: "ПЛАНЫ", m_plan_d: "Купить", m_faq: "FAQ", m_faq_d: "Вопросы?", m_dev: "АДМИНКА", m_dev_d: "Управление", m_disc: "DISCORD", m_disc_d: "Чат", u_prof: "Профиль", acc_det: "Детали", acc_det_d: "Информация в системе.", l_login: "ЛОГИН", l_plan: "ПЛАН", l_reg: "ДАТА РЕГИСТРАЦИИ", l_dev: "АДМИН", k_gen: "Генератор", k_unl: "Доступ", k_desc: "Ключи на 12ч (раз в 24ч).", k_btn: "Сгенерировать", s_lib: "Скрипты", s_good: "Скрипт в бете.", s_copy: "КОПИРОВАТЬ LUA", p_upg: "Планы", p_buy: "Купить", p_my: "Мой План", p_start: "Начальный", p_start_d: "Для новичков.", p_pro: "Про-План", p_pro_d: "Больше функций.", p_ext: "Экстремальный", p_ext_d: "Всё включено.", p_purch: "Купить", p_desc: "Функции активны.", p_rest: "Перезапустить", p_del: "Удалить Аккаунт", p_sup: "Поддержка", f_tit: "FAQ и Поддержка", f_desc: "Есть вопросы? Ответим быстро!", d_tit: "Разработчики", d_desc: "Панель управления.", c_tit: "Комьюнити", c_desc: "Дискорд сервер.", fr_tit: "Аккаунт заморожен", fr_desc: "Пиши админу.", mn_tit: "Тех. работы", mn_desc: "Зайди позже.", login_ph: "Логин", pass_ph: "Пароль", secret_ph: "Секрет", code_ph: "Код", email_ph: "Почта", reg_sec_ph: "Секретное слово", reg_src_ph: "Откуда узнали?", m_cancel: "Отмена", m_confirm: "Подтвердить", disc_club: "Global Scripts Club", disc_desc: "Заходи, общайся, следи за апдейтами!", disc_join: "Зайти в клуб", captcha_ph: "Ответ", r_tit: "Поздравляем!", r_sub: "Вы получили от разработчика:", r_dev: "Разработчик: ", r_btn: "Хорошо!", prompt_msg: "Сообщение юзеру:", r_hist: "История Чеков", r_hist_btn: "Чеки", t_reason_ph: "Причина вызова поддержки...", t_norm: "Обычно", t_fast: "Быстро", t_send: "Отправить запрос", t_suc_tit: "Успешно!", t_suc_desc: "Запрос отправлен разработчикам.", t_msg_ph: "Сообщение...", t_reply: "Отправить", t_close: "Закрыть тикет", t_show_all: "Открыть все" },
-    ja: { theme_btn: "ライト", logout: "ログアウト", auth_btn: "承認", no_acc: "作成する", dev_auth: "開発者認証", dev_desc: "秘密コード", unlock_btn: "解除", cancel: "キャンセル", bot_prot: "保護", bot_desc: "メール確認", verify_btn: "確認", reg_desc: "作成", agree: "同意する", create_btn: "作成", back_login: "戻る", loading: "ロード中...", menu: "メニュー", m_main: "メイン", m_main_d: "プロフィール", m_key: "キー", m_key_d: "アクセス", m_scr: "スクリプト", m_scr_d: "ゲーム", m_plan: "プラン", m_plan_d: "購入", m_faq: "FAQ", m_faq_d: "質問？", m_dev: "開発者", m_dev_d: "管理", m_disc: "DISCORD", m_disc_d: "参加", u_prof: "プロフィール", acc_det: "詳細", acc_det_d: "情報", l_login: "ログイン", l_plan: "プラン", l_reg: "登録", l_dev: "管理者", k_gen: "キー生成", k_unl: "アクセス", k_desc: "12時間有効", k_btn: "生成", s_lib: "ライブラリ", s_good: "ベータ版", s_copy: "コピー", p_upg: "プラン", p_buy: "購入", p_my: "マイスター", p_start: "スターター", p_start_d: "初心者", p_pro: "プロ", p_pro_d: "プロ向け", p_ext: "極", p_ext_d: "すべて", p_purch: "購入", p_desc: "アンロック", p_rest: "再起動", p_del: "削除", p_sup: "サポート", f_tit: "FAQ", f_desc: "質問？", d_tit: "開発者", d_desc: "管理", c_tit: "コミュニティ", c_desc: "参加", fr_tit: "凍結", fr_desc: "連絡して", mn_tit: "メンテ", mn_desc: "後で", login_ph: "ログイン", pass_ph: "パスワード", secret_ph: "秘密", code_ph: "コード", email_ph: "メール", reg_sec_ph: "秘密の言葉", reg_src_ph: "ソース", m_cancel: "キャンセル", m_confirm: "確認", disc_club: "クラブ", disc_desc: "チャットに参加！", disc_join: "参加", captcha_ph: "答え", r_tit: "おめでとう！", r_sub: "取得：", r_dev: "開発者：", r_btn: "OK", prompt_msg: "メッセージ：", r_hist: "レシート", r_hist_btn: "レシート", t_reason_ph: "理由...", t_norm: "通常", t_fast: "早い", t_send: "送信", t_suc_tit: "成功！", t_suc_desc: "送信しました。", t_msg_ph: "メッセージ...", t_reply: "送信", t_close: "閉じる", t_show_all: "すべて表示" },
-    pt: { theme_btn: "Claro", logout: "Sair", auth_btn: "AUTORIZAR", no_acc: "Criar conta", dev_auth: "Dev Auth", dev_desc: "Código secreto.", unlock_btn: "DESBLOQUEAR", cancel: "Cancelar", bot_prot: "Proteção", bot_desc: "Cheque email.", verify_btn: "VERIFICAR", reg_desc: "Criar.", agree: "Concordo", create_btn: "CRIAR", back_login: "Voltar", loading: "Carregando...", menu: "MENU", m_main: "PRINCIPAL", m_main_d: "Perfil", m_key: "CHAVES", m_key_d: "Acesso", m_scr: "SCRIPTS", m_scr_d: "Scripts", m_plan: "PLANOS", m_plan_d: "Comprar", m_faq: "FAQ", m_faq_d: "Dúvidas?", m_dev: "DEVS", m_dev_d: "Admin", m_disc: "DISCORD", m_disc_d: "Junte-se", u_prof: "Perfil", acc_det: "Detalhes", acc_det_d: "Info.", l_login: "LOGIN", l_plan: "PLANO", l_reg: "DATA", l_dev: "ADMIN", k_gen: "Gerador", k_unl: "Acesso", k_desc: "12 horas.", k_btn: "Gerar", s_lib: "Biblioteca", s_good: "Bom.", s_copy: "COPIAR LUA", p_upg: "Planos", p_buy: "Comprar", p_my: "Meu Plano", p_start: "Inicial", p_start_d: "Básico.", p_pro: "Pro", p_pro_d: "Mais.", p_ext: "Extremo", p_ext_d: "Tudo.", p_purch: "Comprar", p_desc: "Ativo.", p_rest: "Reiniciar", p_del: "Excluir", p_sup: "Suporte", f_tit: "FAQ", f_desc: "Dúvidas?", d_tit: "Devs", d_desc: "Admin.", c_tit: "Comunidade", c_desc: "Discord.", fr_tit: "Congelado", fr_desc: "Contate.", mn_tit: "Manutenção", mn_desc: "Tente depois.", login_ph: "Login", pass_ph: "Senha", secret_ph: "Segredo", code_ph: "Código", email_ph: "Email", reg_sec_ph: "Recuperação", reg_src_ph: "Onde conheceu?", m_cancel: "Cancelar", m_confirm: "Confirmar", disc_club: "Clube", disc_desc: "Junte-se ao chat!", disc_join: "Entrar", captcha_ph: "Resposta", r_tit: "Parabéns!", r_sub: "Você recebeu:", r_dev: "Dev: ", r_btn: "OK", prompt_msg: "Mensagem:", r_hist: "Recibos", r_hist_btn: "Recibos", t_reason_ph: "Motivo...", t_norm: "Normal", t_fast: "Rápido", t_send: "Enviar Pedido", t_suc_tit: "Sucesso!", t_suc_desc: "Enviado.", t_msg_ph: "Mensagem...", t_reply: "Enviar", t_close: "Fechar", t_show_all: "Ver todos" }
+    en: { 
+        theme_btn: "Light Mode", logout: "Logout", auth_btn: "AUTHORIZE", no_acc: "Don't have an account? Create it!", 
+        dev_auth: "Developer Authentication", dev_desc: "Enter secret codename.", unlock_btn: "UNLOCK MAINFRAME", cancel: "Cancel", 
+        bot_prot: "Bot Protection", bot_desc: "Check your email.", verify_btn: "VERIFY", reg_desc: "Describe yourself.", 
+        agree: "I agree to privacy cookies", create_btn: "CREATE ACCOUNT", back_login: "Back to Login", loading: "Authenticating System...", 
+        menu: "MENU", m_main: "MAIN", m_main_d: "Your main profile", m_key: "KEY SYSTEM", m_key_d: "Get a key", 
+        m_scr: "SCRIPTS", m_scr_d: "Game scripts", m_plan: "PLANS", m_plan_d: "Buy plans", m_faq: "FAQ", m_faq_d: "Got questions?", 
+        m_dev: "DEVELOPERS", m_dev_d: "Admin Panel", m_disc: "DISCORD", m_disc_d: "Join us", u_prof: "User Profile", 
+        acc_det: "Account Details", acc_det_d: "Your personal overview.", l_login: "LOGIN", l_plan: "CURRENT PLAN", 
+        l_reg: "REGISTRATION", l_dev: "DEV APPROVED", k_gen: "Key Generator", k_unl: "Unlock Free Access", 
+        k_desc: "Generate keys (12h). 1 per day.", k_btn: "Generate New Key", s_lib: "Scripts Library", s_good: "Good script in beta.", 
+        s_copy: "COPY LUA SCRIPT", p_upg: "Upgrade Plans", p_buy: "Buy Plan", p_my: "My Current Plan", p_start: "Starter Plan", 
+        p_start_d: "Little access.", p_pro: "Professional Plan", p_pro_d: "More access.", p_ext: "Extreme Plan", p_ext_d: "All access.", 
+        p_purch: "Purchase", p_desc: "Features unlocked.", p_rest: "Restart Plan", p_del: "Delete Account", p_sup: "Contact Support", 
+        f_tit: "FAQ & Support", f_desc: "Got questions? We answer fast!", d_tit: "Developers", d_desc: "Mainframe architecture.", 
+        c_tit: "Community", c_desc: "Join Discord.", fr_tit: "Account frozen", fr_desc: "Contact dev.", mn_tit: "Site Maintenance", 
+        mn_desc: "Try again later.", login_ph: "Login", pass_ph: "Password", secret_ph: "Secret Word", code_ph: "Code", 
+        email_ph: "Email", reg_sec_ph: "Secret recovery word", reg_src_ph: "How did you hear about us?", m_cancel: "Cancel", 
+        m_confirm: "Confirm", disc_club: "Global Scripts Club", disc_desc: "Join to follow updates and chat!", disc_join: "Join the Club", 
+        captcha_ph: "Answer", r_tit: "Congratulations!", r_sub: "You received:", r_dev: "Developer: ", r_btn: "Okay!", 
+        prompt_msg: "Message for user:", r_hist: "Receipts History", r_hist_btn: "Receipts", t_reason_ph: "Reason for support...", 
+        t_norm: "Normal Speed", t_fast: "Fast Response", t_send: "Send Support Request", t_suc_tit: "Request Created!", 
+        t_suc_desc: "Ticket submitted to developers.", t_msg_ph: "Type message...", t_reply: "Send", t_close: "Close Ticket", 
+        t_show_all: "Show All",
+        l_title: "Dive in, ride with Global Scripts", 
+        l_sub: "Experience the next generation of script execution. Packed with power, built for stability, and designed for you. Join the elite community today.", 
+        l_btn: "LOGIN TO START", 
+        f_fast: "Lightning Fast", 
+        f_fast_d: "Blazing fast script execution with virtually zero delay and optimized memory usage.", 
+        f_crash: "Crash Resistant", 
+        f_crash_d: "Tested interface and advanced stability protocols built by veteran developers.", 
+        f_cloud: "Cloud Hub", 
+        f_cloud_d: "Instant access to a massive verified database of scripts for all popular games."
+    },
+    ru: { 
+        theme_btn: "Светлая тема", logout: "Выйти", auth_btn: "АВТОРИЗАЦИЯ", no_acc: "Нет аккаунта? Создайте!", 
+        dev_auth: "Проверка", dev_desc: "Секретный код.", unlock_btn: "РАЗБЛОКИРОВАТЬ", cancel: "Отмена", bot_prot: "Защита", 
+        bot_desc: "Код на почте.", verify_btn: "ПОДТВЕРДИТЬ", reg_desc: "Создание аккаунта.", agree: "Согласен с правилами", 
+        create_btn: "СОЗДАТЬ", back_login: "Назад", loading: "Загрузка...", menu: "МЕНЮ", m_main: "ГЛАВНАЯ", 
+        m_main_d: "Профиль", m_key: "КЛЮЧИ", m_key_d: "Получить доступ", m_scr: "СКРИПТЫ", m_scr_d: "Игровые скрипты", 
+        m_plan: "ПЛАНЫ", m_plan_d: "Купить", m_faq: "FAQ", m_faq_d: "Вопросы?", m_dev: "АДМИНКА", m_dev_d: "Управление", 
+        m_disc: "DISCORD", m_disc_d: "Чат", u_prof: "Профиль", acc_det: "Детали", acc_det_d: "Информация в системе.", 
+        l_login: "ЛОГИН", l_plan: "ПЛАН", l_reg: "ДАТА РЕГИСТРАЦИИ", l_dev: "АДМИН", k_gen: "Генератор", k_unl: "Доступ", 
+        k_desc: "Ключи на 12ч (раз в 24ч).", k_btn: "Сгенерировать", s_lib: "Скрипты", s_good: "Скрипт в бете.", 
+        s_copy: "КОПИРОВАТЬ LUA", p_upg: "Планы", p_buy: "Купить", p_my: "Мой План", p_start: "Начальный", p_start_d: "Для новичков.", 
+        p_pro: "Про-План", p_pro_d: "Больше функций.", p_ext: "Экстремальный", p_ext_d: "Всё включено.", p_purch: "Купить", 
+        p_desc: "Функции активны.", p_rest: "Перезапустить", p_del: "Удалить Аккаунт", p_sup: "Поддержка", f_tit: "FAQ и Поддержка", 
+        f_desc: "Есть вопросы? Ответим быстро!", d_tit: "Разработчики", d_desc: "Панель управления.", c_tit: "Комьюнити", 
+        c_desc: "Дискорд сервер.", fr_tit: "Аккаунт заморожен", fr_desc: "Пиши админу.", mn_tit: "Тех. работы", 
+        mn_desc: "Зайди позже.", login_ph: "Логин", pass_ph: "Пароль", secret_ph: "Секрет", code_ph: "Код", email_ph: "Почта", 
+        reg_sec_ph: "Секретное слово", reg_src_ph: "Откуда узнали?", m_cancel: "Отмена", m_confirm: "Подтвердить", 
+        disc_club: "Global Scripts Club", disc_desc: "Заходи, общайся, следи за апдейтами!", disc_join: "Зайти в клуб", 
+        captcha_ph: "Ответ", r_tit: "Поздравляем!", r_sub: "Вы получили от разработчика:", r_dev: "Разработчик: ", r_btn: "Хорошо!", 
+        prompt_msg: "Сообщение юзеру:", r_hist: "История Чеков", r_hist_btn: "Чеки", t_reason_ph: "Причина вызова поддержки...", 
+        t_norm: "Обычно", t_fast: "Быстро", t_send: "Отправить запрос", t_suc_tit: "Успешно!", t_suc_desc: "Запрос отправлен разработчикам.", 
+        t_msg_ph: "Сообщение...", t_reply: "Отправить", t_close: "Закрыть тикет", t_show_all: "Открыть все",
+        l_title: "Погружайся, лети с Global Scripts", 
+        l_sub: "Ощути новое поколение запуска скриптов. Мощно, стабильно и сделано специально для тебя. Присоединяйся к элитному комьюнити уже сегодня.", 
+        l_btn: "ВОЙТИ ДЛЯ НАЧАЛА", 
+        f_fast: "Молниеносная Скорость", 
+        f_fast_d: "Сверхбыстрый запуск скриптов практически без задержек и оптимизированное потребление памяти.", 
+        f_crash: "Защита от крашей", 
+        f_crash_d: "Проверенный интерфейс и передовые протоколы стабильности от разработчиков-ветеранов.", 
+        f_cloud: "Облачный Хаб", 
+        f_cloud_d: "Мгновенный доступ к огромной проверенной базе скриптов для всех популярных режимов."
+    },
+    ja: { 
+        theme_btn: "ライト", logout: "ログアウト", auth_btn: "承認", no_acc: "作成する", dev_auth: "開発者認証", dev_desc: "秘密コード", 
+        unlock_btn: "解除", cancel: "キャンセル", bot_prot: "保護", bot_desc: "メール確認", verify_btn: "確認", reg_desc: "作成", 
+        agree: "同意する", create_btn: "作成", back_login: "戻る", loading: "ロード中...", menu: "メニュー", m_main: "メイン", 
+        m_main_d: "プロフィール", m_key: "キー", m_key_d: "アクセス", m_scr: "スクリプト", m_scr_d: "ゲーム", m_plan: "プラン", 
+        m_plan_d: "購入", m_faq: "FAQ", m_faq_d: "質問？", m_dev: "開発者", m_dev_d: "管理", m_disc: "DISCORD", m_disc_d: "参加", 
+        u_prof: "プロフィール", acc_det: "詳細", acc_det_d: "情報", l_login: "ログイン", l_plan: "プラン", l_reg: "登録", 
+        l_dev: "管理者", k_gen: "キー生成", k_unl: "アクセス", k_desc: "12時間有効", k_btn: "生成", s_lib: "ライブラリ", 
+        s_good: "ベータ版", s_copy: "コピー", p_upg: "プラン", p_buy: "購入", p_my: "マイスター", p_start: "スターター", 
+        p_start_d: "初心者", p_pro: "プロ", p_pro_d: "プロ向け", p_ext: "極", p_ext_d: "すべて", p_purch: "購入", p_desc: "アンロック", 
+        p_rest: "再起動", p_del: "削除", p_sup: "サポート", f_tit: "FAQ", f_desc: "質問？", d_tit: "開発者", d_desc: "管理", 
+        c_tit: "コミュニティ", c_desc: "参加", fr_tit: "凍結", fr_desc: "連絡して", mn_tit: "メンテ", mn_desc: "後で", 
+        login_ph: "ログイン", pass_ph: "パスワード", secret_ph: "秘密", code_ph: "コード", email_ph: "メール", reg_sec_ph: "秘密の言葉", 
+        reg_src_ph: "ソース", m_cancel: "キャンセル", m_confirm: "確認", disc_club: "クラブ", disc_desc: "チャットに参加！", 
+        disc_join: "参加", captcha_ph: "答え", r_tit: "おめでとう！", r_sub: "取得：", r_dev: "開発者：", r_btn: "OK", 
+        prompt_msg: "メッセージ：", r_hist: "レシート", r_hist_btn: "レシート", t_reason_ph: "理由...", t_norm: "通常", 
+        t_fast: "早い", t_send: "送信", t_suc_tit: "成功！", t_suc_desc: "送信しました。", t_msg_ph: "メッセージ...", 
+        t_reply: "送信", t_close: "閉じる", t_show_all: "すべて表示",
+        l_title: "Global Scriptsで波に乗れ", 
+        l_sub: "次世代のスクリプト実行を体験しよう。強力で安定し、あなたのために設計されています。今すぐエリートコミュニティに参加しよう。", 
+        l_btn: "ログインして開始", 
+        f_fast: "超高速", 
+        f_fast_d: "遅延がほとんどなく、メモリ使用量を最適化した超高速なスクリプト実行。", 
+        f_crash: "クラッシュ耐性", 
+        f_crash_d: "熟練の開発者によって構築された、テスト済みのインターフェースと高度な安定性プロトコル。", 
+        f_cloud: "クラウドハブ", 
+        f_cloud_d: "すべての人気ゲーム向けの検証済みスクリプトの巨大なデータベースへの即時アクセス。"
+    },
+    pt: { 
+        theme_btn: "Claro", logout: "Sair", auth_btn: "AUTORIZAR", no_acc: "Criar conta", dev_auth: "Dev Auth", dev_desc: "Código secreto.", 
+        unlock_btn: "DESBLOQUEAR", cancel: "Cancelar", bot_prot: "Proteção", bot_desc: "Cheque email.", verify_btn: "VERIFICAR", 
+        reg_desc: "Criar.", agree: "Concordo", create_btn: "CRIAR", back_login: "Voltar", loading: "Carregando...", menu: "MENU", 
+        m_main: "PRINCIPAL", m_main_d: "Perfil", m_key: "CHAVES", m_key_d: "Acesso", m_scr: "SCRIPTS", m_scr_d: "Scripts", 
+        m_plan: "PLANOS", m_plan_d: "Comprar", m_faq: "FAQ", m_faq_d: "Dúvidas?", m_dev: "DEVS", m_dev_d: "Admin", 
+        m_disc: "DISCORD", m_disc_d: "Junte-se", u_prof: "Perfil", acc_det: "Detalhes", acc_det_d: "Info.", l_login: "LOGIN", 
+        l_plan: "PLANO", l_reg: "DATA", l_dev: "ADMIN", k_gen: "Gerador", k_unl: "Acesso", k_desc: "12 horas.", k_btn: "Gerar", 
+        s_lib: "Biblioteca", s_good: "Bom.", s_copy: "COPIAR LUA", p_upg: "Planos", p_buy: "Comprar", p_my: "Meu Plano", 
+        p_start: "Inicial", p_start_d: "Básico.", p_pro: "Pro", p_pro_d: "Mais.", p_ext: "Extremo", p_ext_d: "Tudo.", p_purch: "Comprar", 
+        p_desc: "Ativo.", p_rest: "Reiniciar", p_del: "Excluir", p_sup: "Suporte", f_tit: "FAQ", f_desc: "Dúvidas?", d_tit: "Devs", 
+        d_desc: "Admin.", c_tit: "Comunidade", c_desc: "Discord.", fr_tit: "Congelado", fr_desc: "Contate.", mn_tit: "Manutenção", 
+        mn_desc: "Tente depois.", login_ph: "Login", pass_ph: "Senha", secret_ph: "Segredo", code_ph: "Código", email_ph: "Email", 
+        reg_sec_ph: "Recuperação", reg_src_ph: "Onde conheceu?", m_cancel: "Cancelar", m_confirm: "Confirmar", disc_club: "Clube", 
+        disc_desc: "Junte-se ao chat!", disc_join: "Entrar", captcha_ph: "Resposta", r_tit: "Parabéns!", r_sub: "Você recebeu:", 
+        r_dev: "Dev: ", r_btn: "OK", prompt_msg: "Mensagem:", r_hist: "Recibos", r_hist_btn: "Recibos", t_reason_ph: "Motivo...", 
+        t_norm: "Normal", t_fast: "Rápido", t_send: "Enviar Pedido", t_suc_tit: "Sucesso!", t_suc_desc: "Enviado.", 
+        t_msg_ph: "Mensagem...", t_reply: "Enviar", t_close: "Fechar", t_show_all: "Ver todos",
+        l_title: "Mergulhe, voe com a Global Scripts", 
+        l_sub: "Experimente a próxima geração de execução de scripts. Potente, estável e feito para você. Junte-se à comunidade de elite hoje.", 
+        l_btn: "ENTRAR PARA COMEÇAR", 
+        f_fast: "Super Rápido", 
+        f_fast_d: "Execução de script extremamente rápida com praticamente zero de atraso e uso otimizado de memória.", 
+        f_crash: "Resistente a Falhas", 
+        f_crash_d: "Interface testada e protocolos avançados de estabilidade construídos por desenvolvedores veteranos.", 
+        f_cloud: "Hub em Nuvem", 
+        f_cloud_d: "Acesso instantâneo a um enorme banco de dados verificado de scripts para todos os jogos populares."
+    }
   };
 
   let currentLang = 'en';
@@ -1401,11 +1514,26 @@ button { position: relative; overflow: hidden; }
       });
     });
 
-    if ({{ 'true' if current_user else 'false' }}) { 
+    let isUserLoggedIn = {{ 'true' if current_user else 'false' }};
+    
+    if (isUserLoggedIn) { 
         document.getElementById('introOverlay').style.display = 'none';
         document.getElementById('landingWrapper').style.display = 'none';
         appMainWrapper.style.display = 'flex';
         loadDashboard(); 
+    } else {
+        setTimeout(() => {
+            const intro = document.getElementById('introOverlay');
+            if(intro) {
+                intro.style.opacity = '0';
+                setTimeout(() => {
+                    intro.style.display = 'none';
+                    document.getElementById('landingWrapper').style.display = 'flex';
+                    updateIcons();
+                    initTiltEffect();
+                }, 800);
+            }
+        }, 2000); 
     }
 
     function loadDashboard() {
@@ -1766,16 +1894,32 @@ def get_scripts():
     is_admin_request = request.args.get('admin') == 'true'
     current_user = session.get('user')
     conn = get_db_connection()
+    tz = pytz.timezone('Europe/Moscow')
+    now = datetime.now(tz)
+    
     if is_admin_request:
         check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
         if not check or check['dev_approved'] != 'Yes': 
             conn.close()
             return jsonify({'success': False}), 403
         scripts = conn.execute("SELECT * FROM scripts ORDER BY id DESC").fetchall()
+        scripts_data = [dict(s) for s in scripts]
     else:
         scripts = conn.execute("SELECT * FROM scripts WHERE is_frozen = 'No' ORDER BY id DESC").fetchall()
+        scripts_data = []
+        for s in scripts:
+            s_dict = dict(s)
+            try:
+                release_time = datetime.strptime(s_dict['release_date'], '%Y-%m-%dT%H:%M')
+                release_time = tz.localize(release_time)
+                if now < release_time:
+                    s_dict['script_code'] = "ENCRYPTED_WAIT_FOR_RELEASE"
+            except:
+                pass
+            scripts_data.append(s_dict)
+            
     conn.close()
-    return jsonify({'success': True, 'scripts': [dict(s) for s in scripts]})
+    return jsonify({'success': True, 'scripts': scripts_data})
 
 @app.route('/admin/save_script', methods=['POST'])
 def save_script():
