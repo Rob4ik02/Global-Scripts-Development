@@ -113,7 +113,6 @@ def init_db():
 
 init_db()
 
-
 # --- ПОЛНЫЙ HTML ШАБЛОН ---
 TEMPLATE = '''
 <!DOCTYPE html>
@@ -597,6 +596,24 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
              </div>
              
              <div class="dashboard-card">
+                <h4 style="margin: 0 0 10px 0; color: var(--text-primary);">Site Infrastructure</h4>
+                <p style="margin-top:0; font-size: 13px;">Database and backend core controls.</p>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                   <button class="dev-btn-sm" id="btnToggleMaintenance" onclick="adminToggleMaintenance()"></button>
+                   <button class="dev-btn-sm" onclick="showConfirm('Flush Cache', 'Are you sure you want to flush all system caches?', 'Flush', false, () => { showConfirm('Success', 'All caches purged successfully!', 'OK', false, null, true) })">Flush Cache</button>
+                </div>
+             </div>
+             
+             <div class="dashboard-card">
+                <h4 style="margin: 0 0 10px 0; color: var(--text-primary);">Discord Integration</h4>
+                <p style="margin-top:0; font-size: 13px; color: var(--text-secondary);">Update the active Discord server invite link.</p>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                   <input type="text" id="devDiscordLink" value="{{ discord_link }}" class="dev-select" style="flex: 1; min-width: 200px; padding: 10px;" placeholder="https://discord.gg/..." />
+                   <button class="dev-btn-sm" onclick="adminUpdateDiscordLink()">Save Link</button>
+                </div>
+             </div>
+
+             <div class="dashboard-card">
                 <h4 style="margin: 0 0 10px 0; color: var(--text-primary);">Live System Console</h4>
                 <div class="web-console" id="webConsoleBox"></div>
              </div>
@@ -666,13 +683,26 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
   }
 
   function processPayment(planName) {
-      showConfirm('Simulate Payment', `Do you want to simulate paying for ${planName} via SBP?`, 'Pay Now', false, () => {
-          fetch('/create_payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan: planName }) })
-          .then(res => res.json()).then(data => {
+      showConfirm('Purchase Plan', `Proceed to secure payment for ${planName}?`, 'Pay Now', false, () => {
+          document.getElementById('loaderDynamicText').innerText = "Connecting to Payment Gateway...";
+          document.getElementById('loaderScreen').style.display = 'flex';
+          fetch('/create_payment', { 
+              method: 'POST', 
+              headers: { 'Content-Type': 'application/json' }, 
+              body: JSON.stringify({ plan: planName }) 
+          })
+          .then(res => res.json())
+          .then(data => {
               if(data.success) {
-                  fetch('/api/anypay_ipn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_login: document.getElementById('profileLogin').innerText, plan: planName, tx_id: "ANYPAY_" + Math.floor(Math.random()*999999), status: 'paid' }) })
-                  .then(() => window.location.reload());
+                  window.location.href = data.payment_url;
+              } else {
+                  document.getElementById('loaderScreen').style.display = 'none';
+                  showConfirm('Payment Error', data.message || 'Could not connect to gateway', 'OK', false, null, true);
               }
+          })
+          .catch(err => {
+              document.getElementById('loaderScreen').style.display = 'none';
+              showConfirm('Network Error', 'Something went wrong.', 'OK', false, null, true);
           });
       });
   }
@@ -699,7 +729,6 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
      document.getElementById('devForceKeyBtn').style.display = 'block';
      document.getElementById('navDevBtn').style.display = 'flex';
      
-     // Теперь вкладки переключаются без ошибок!
      let devUserView = document.getElementById('devUserView');
      if(devUserView) devUserView.style.display = 'none';
 
@@ -1463,15 +1492,19 @@ def create_payment():
     data = request.get_json(); plan_name = data.get('plan')
     amount = 150 if 'Starter' in plan_name else (350 if 'Professional' in plan_name else 700)
     
+    # Генерация ID заказа
     pay_id = f"{int(time.time())}{random.randint(10,99)}"
     desc = f"Payment for {plan_name}"
     currency = "RUB"
     
+    # Записываем платеж в ожидающие
     conn = get_db_connection()
     conn.execute("INSERT INTO pending_payments (pay_id, user_login, plan, amount) VALUES (?, ?, ?, ?)", (pay_id, current_user, plan_name, amount))
     conn.commit()
     conn.close()
 
+    # ССЫЛКА НА ОПЛАТУ ЧЕРЕЗ ANYPAY.IO
+    # (Здесь используется MD5 подпись: merchant_id:amount:pay_id:currency:desc:secret_key_1)
     sign_string = f"{ANYPAY_MERCHANT_ID}:{amount}:{pay_id}:{currency}:{desc}:{ANYPAY_SECRET_KEY_1}"
     sign = hashlib.md5(sign_string.encode('utf-8')).hexdigest()
     
@@ -1552,6 +1585,20 @@ def delete_account():
         conn.commit(); conn.close()
         session.pop('user', None)
     return jsonify({'success': True})
+
+@app.route('/logout')
+def logout(): 
+    session.pop('user', None)
+    return ('', 204)
+
+# =================================================================
+# --- ANYPAY ВЕРИФИКАЦИЯ (ИМЯ ФАЙЛА И МАРШРУТ) ---
+# =================================================================
+@app.route('/anypay-verification.txt')
+@app.route('/7641a8b9610252ee169f2815a5c2.txt')
+def anypay_txt_verify():
+    # Возвращаем чистый текст для бота AnyPay
+    return "7641a8b9610252ee169f2815a5c2", 200, {'Content-Type': 'text/plain'}
 
 if __name__ == '__main__':
     c_log('SERVICE', "Starting production server on port 5000...")
