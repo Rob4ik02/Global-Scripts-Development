@@ -13,9 +13,9 @@ from datetime import datetime, timedelta
 import pytz
 
 # --- НАСТРОЙКИ ANYPAY.IO ---
-ANYPAY_MERCHANT_ID = "ТВОЙ_ID_ПРОЕКТА" 
-ANYPAY_SECRET_KEY_1 = "ТВОЙ_СЕКРЕТНЫЙ_КЛЮЧ_1" 
-ANYPAY_SECRET_KEY_2 = "ТВОЙ_СЕКРЕТНЫЙ_КЛЮЧ_2" 
+ANYPAY_MERCHANT_ID = "JKM95WB5BOCX8KP4A2" 
+ANYPAY_SECRET_KEY_1 = "WhBnybt73zKilvcgcjSVJCShtdi8xOZSHqUSaG7" 
+ANYPAY_SECRET_KEY_2 = "" 
 
 # --- СИСТЕМА ЛОГИРОВАНИЯ КОНСОЛИ ---
 LIVE_LOGS = []
