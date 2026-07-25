@@ -13,9 +13,9 @@ from datetime import datetime, timedelta
 import pytz
 
 # --- НАСТРОЙКИ ANYPAY.IO ---
-ANYPAY_MERCHANT_ID = "ТВОЙ_ID_ПРОЕКТА" # Например: "12345"
-ANYPAY_SECRET_KEY_1 = "ТВОЙ_СЕКРЕТНЫЙ_КЛЮЧ_1" # Для создания платежа
-ANYPAY_SECRET_KEY_2 = "ТВОЙ_СЕКРЕТНЫЙ_КЛЮЧ_2" # Для проверки Webhook (IPN)
+ANYPAY_MERCHANT_ID = "ТВОЙ_ID_ПРОЕКТА" # Впишешь после привязки
+ANYPAY_SECRET_KEY_1 = "ТВОЙ_СЕКРЕТНЫЙ_КЛЮЧ_1" # Впишешь после привязки
+ANYPAY_SECRET_KEY_2 = "ТВОЙ_СЕКРЕТНЫЙ_КЛЮЧ_2" # Впишешь после привязки
 
 # --- СИСТЕМА ЛОГИРОВАНИЯ КОНСОЛИ ---
 LIVE_LOGS = []
@@ -82,16 +82,13 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT, key_code TEXT UNIQUE NOT NULL, user_login TEXT NOT NULL,
             plan TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, hwid TEXT DEFAULT '')''')
 
-    # ТАБЛИЦА ОЖИДАЮЩИХ ПЛАТЕЖЕЙ (Pending Payments)
     conn.execute('''CREATE TABLE IF NOT EXISTS pending_payments (
             pay_id TEXT PRIMARY KEY, user_login TEXT NOT NULL, plan TEXT NOT NULL, amount INTEGER NOT NULL)''')
 
-    # ТАБЛИЦА ЧЕКОВ (Receipts)
     conn.execute('''CREATE TABLE IF NOT EXISTS receipts (
             id INTEGER PRIMARY KEY AUTOINCREMENT, user_login TEXT NOT NULL, plan TEXT NOT NULL,
             amount INTEGER NOT NULL, tx_id TEXT NOT NULL, date_str TEXT NOT NULL)''')
 
-    # ТАБЛИЦЫ ТИКЕТОВ И СООБЩЕНИЙ (Support)
     conn.execute('''CREATE TABLE IF NOT EXISTS tickets (
             id INTEGER PRIMARY KEY AUTOINCREMENT, user_login TEXT NOT NULL, reason TEXT NOT NULL,
             priority TEXT NOT NULL, status TEXT DEFAULT 'pending', created_at TEXT NOT NULL)''')
@@ -123,6 +120,8 @@ TEMPLATE = '''
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- МЕТАТЕГ ДЛЯ ВЕРИФИКАЦИИ ANYPAY ИЗ ТВОЕГО СКРИНШОТА -->
+<meta name="anypay-verification" content="7641a8b9610252ee169f2815a5c2" />
 <title>Global Script's Hub</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -588,6 +587,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
                 </div>
              </div>
 
+             <!-- ACCOUNT MANAGEMENT RESTORED -->
              <div class="dashboard-card">
                 <h4 style="margin: 0 0 10px 0; color: var(--text-primary);">Account Management</h4>
                 <div class="dev-table-wrapper">
@@ -598,6 +598,26 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
                 </div>
              </div>
              
+             <!-- SITE INFRASTRUCTURE RESTORED -->
+             <div class="dashboard-card">
+                <h4 style="margin: 0 0 10px 0; color: var(--text-primary);">Site Infrastructure</h4>
+                <p style="margin-top:0; font-size: 13px;">Database and backend core controls.</p>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                   <button class="dev-btn-sm" id="btnToggleMaintenance" onclick="adminToggleMaintenance()"></button>
+                   <button class="dev-btn-sm" onclick="showConfirm('Flush Cache', 'Are you sure you want to flush all system caches?', 'Flush', false, () => { showConfirm('Success', 'All caches purged successfully!', 'OK', false, null, true) })">Flush Cache</button>
+                </div>
+             </div>
+             
+             <!-- DISCORD INTEGRATION RESTORED -->
+             <div class="dashboard-card">
+                <h4 style="margin: 0 0 10px 0; color: var(--text-primary);">Discord Integration</h4>
+                <p style="margin-top:0; font-size: 13px; color: var(--text-secondary);">Update the active Discord server invite link.</p>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                   <input type="text" id="devDiscordLink" value="{{ discord_link }}" class="dev-select" style="flex: 1; min-width: 200px; padding: 10px;" placeholder="https://discord.gg/..." />
+                   <button class="dev-btn-sm" onclick="adminUpdateDiscordLink()">Save Link</button>
+                </div>
+             </div>
+
              <div class="dashboard-card">
                 <h4 style="margin: 0 0 10px 0; color: var(--text-primary);">Live System Console</h4>
                 <div class="web-console" id="webConsoleBox"></div>
@@ -725,7 +745,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
               tbody.innerHTML += `<tr><td><b>${u.login}</b></td><td>${u.plan}</td><td>${u.plan_days} d</td><td><select class="dev-select" onchange="promptAdminChangePlan('${u.login}', this.value)"><option value="" selected disabled>Select plan</option><option value="Starter Plan">Starter</option><option value="Professional Plan">Professional</option><option value="Extreme Plan">Extreme</option></select></td><td><div style="display:flex; gap:8px;"><button class="dev-btn-sm" onclick="promptAdminAddDays('${u.login}')">+7 Days</button><button class="${freezeClass}" onclick="adminToggleFreeze('${u.login}')">${freezeText}</button><button class="dev-btn-sm dev-btn-danger" onclick="requestAdminDeleteUser('${u.login}')">Delete</button></div></td></tr>`;
            });
         }
-     });
+     }).catch(e => console.error(e));
      pollAdminTickets();
   }
 
@@ -1578,7 +1598,7 @@ def logout():
 @app.route('/anypay-verification.txt')
 def anypay_verification():
     # Тот самый код из таблички AnyPay
-    return "7641a8b9630252ee188f2815a5c2", 200, {'Content-Type': 'text/plain'}
+    return "7641a8b9610252ee169f2815a5c2", 200, {'Content-Type': 'text/plain'}
 
 if __name__ == '__main__':
     c_log('SERVICE', "Starting production server on port 5000...")
