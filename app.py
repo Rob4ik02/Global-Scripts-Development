@@ -1,12 +1,13 @@
 import os
 import sqlite3
 import random
+import string
 import time
 import smtplib
 from email.mime.text import MIMEText
 from flask import Flask, render_template_string, request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 
 # --- СИСТЕМА ЛОГИРОВАНИЯ КОНСОЛИ ---
@@ -15,7 +16,7 @@ LIVE_LOGS = []
 def c_log(level, message):
     tz = pytz.timezone('Europe/Moscow')
     now = datetime.now(tz)
-    date_str = now.strftime('%d.%m.%Y | %H:%M')
+    date_str = now.strftime('%d.%m.%Y | %H:%M:%S')
     
     colors = {
         'INFO': '\033[97m',
@@ -45,7 +46,6 @@ def c_log(level, message):
     if len(LIVE_LOGS) > 50:
         LIVE_LOGS.pop(0)
 
-# Инициализация Flask
 c_log('SERVICE', "Initializing Flask application...")
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'fallback-dev-secret-key-123')
@@ -97,17 +97,23 @@ def init_db():
             reg_date TEXT,
             plan TEXT DEFAULT 'Free Tier',
             plan_days INTEGER DEFAULT 0,
-            dev_approved TEXT DEFAULT 'No'
+            dev_approved TEXT DEFAULT 'No',
+            is_frozen TEXT DEFAULT 'No'
         )
     ''')
     
-    cursor = conn.execute("PRAGMA table_info(users)")
-    columns = [col[1] for col in cursor.fetchall()]
-    if 'is_frozen' not in columns:
-        c_log('SERVICE', "Updating database schema: Adding 'is_frozen' column...")
-        conn.execute("ALTER TABLE users ADD COLUMN is_frozen TEXT DEFAULT 'No'")
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS keys (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            key_code TEXT UNIQUE NOT NULL,
+            user_login TEXT NOT NULL,
+            plan TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            hwid TEXT DEFAULT ''
+        )
+    ''')
 
-    # Таблица настроек
     conn.execute('''
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
@@ -199,16 +205,8 @@ body {
 
 @keyframes globalFocus { 0% { filter: blur(20px); transform: scale(1.05); } 100% { filter: blur(0px); transform: scale(1); } }
 
-.ambient-bg {
-  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -3;
-  background: radial-gradient(circle at 15% 30%, rgba(40, 40, 45, 0.4) 0%, transparent 50%),
-              radial-gradient(circle at 85% 80%, rgba(30, 30, 35, 0.4) 0%, transparent 50%);
-  filter: blur(40px); opacity: 0; animation: ambientFade 3s ease-in-out 0.5s forwards; pointer-events: none;
-}
-[data-theme="light"] .ambient-bg {
-  background: radial-gradient(circle at 15% 30%, rgba(200, 200, 220, 0.4) 0%, transparent 50%),
-              radial-gradient(circle at 85% 80%, rgba(180, 180, 200, 0.4) 0%, transparent 50%);
-}
+.ambient-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -3; background: radial-gradient(circle at 15% 30%, rgba(40, 40, 45, 0.4) 0%, transparent 50%), radial-gradient(circle at 85% 80%, rgba(30, 30, 35, 0.4) 0%, transparent 50%); filter: blur(40px); opacity: 0; animation: ambientFade 3s ease-in-out 0.5s forwards; pointer-events: none; }
+[data-theme="light"] .ambient-bg { background: radial-gradient(circle at 15% 30%, rgba(200, 200, 220, 0.4) 0%, transparent 50%), radial-gradient(circle at 85% 80%, rgba(180, 180, 200, 0.4) 0%, transparent 50%); }
 @keyframes ambientFade { to { opacity: 1; } }
 
 #bgCanvas { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -2; opacity: 0; animation: fadeInCanvas 2s ease-in-out forwards; pointer-events: none; }
@@ -230,7 +228,6 @@ body {
 .ui-pill { background: var(--card-bg); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); border: 1px solid var(--card-border); box-shadow: var(--shadow-drop), var(--shadow-inner); color: var(--text-primary); padding: 8px 16px; border-radius: 98px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 10px; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.3s ease; cursor: pointer; position: relative;}
 .ui-pill:hover { transform: scale(1.05) translateY(-1px); }
 
-/* ЯЗЫКОВОЕ МЕНЮ */
 .lang-dropdown-wrapper { position: relative; }
 .lang-menu { position: absolute; top: 120%; left: 0; background: var(--card-bg); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); border: 1px solid var(--card-border); border-radius: 16px; padding: 8px; display: flex; flex-direction: column; gap: 4px; opacity: 0; pointer-events: none; transform: translateY(-10px); transition: all 0.3s ease; box-shadow: var(--shadow-drop); min-width: 120px; z-index: 1000;}
 .lang-menu.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
@@ -269,53 +266,24 @@ body {
 .create-link:hover, .back-link:hover { opacity: 1; }
 .back-link { display: block; text-align: center; margin-top: 8px; }
 
-#message, #regMessage, #twoFaMessage, #secretMessage { font-weight: 600; font-size: 12px; text-align: center; min-height: 16px; opacity: 0; transition: opacity 0.4s ease, color 0.3s ease; margin-top: 4px; }
-#message.show, #regMessage.show, #twoFaMessage.show, #secretMessage.show { opacity: 1; }
+#message, #regMessage, #twoFaMessage, #secretMessage, #keyMessage { font-weight: 600; font-size: 12px; text-align: center; min-height: 16px; opacity: 0; transition: opacity 0.4s ease, color 0.3s ease; margin-top: 4px; }
+#message.show, #regMessage.show, #twoFaMessage.show, #secretMessage.show, #keyMessage.show { opacity: 1; }
 .success-msg { color: #34c759; }
 .error-msg { color: var(--error); }
 
-/* --- ЭКРАНЫ ЗАМОРОЗКИ И ВЫКЛЮЧЕННОГО САЙТА --- */
-.fullscreen-overlay {
-  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000;
-  display: flex; flex-direction: column; justify-content: center; align-items: center;
-  text-align: center; padding: 20px; overflow: hidden;
-}
-#freezeScreen {
-  background: radial-gradient(circle at center, rgba(10, 191, 255, 0.1) 0%, var(--bg-color) 80%);
-  backdrop-filter: blur(10px) contrast(1.1); -webkit-backdrop-filter: blur(10px) contrast(1.1);
-}
-#maintenanceScreen {
-  background: radial-gradient(circle at center, rgba(255, 159, 10, 0.08) 0%, var(--bg-color) 80%),
-              repeating-linear-gradient(45deg, rgba(255, 159, 10, 0.03), rgba(255, 159, 10, 0.03) 10px, transparent 10px, transparent 20px);
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-}
-.bg-massive-icon {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  font-size: 280px; z-index: 1; user-select: none;
-}
-#freezeScreen .bg-massive-icon {
-  opacity: 0.2; color: #0abfff; filter: drop-shadow(0 0 50px #0abfff); animation: spin 10s linear infinite;
-}
-#maintenanceScreen .bg-massive-icon {
-  opacity: 0.15; color: #ff9f0a; filter: drop-shadow(0 0 40px #ff9f0a); animation: slowPulse 3s ease-in-out infinite; cursor: pointer;
-}
-.overlay-content-box {
-  position: relative; z-index: 2; max-width: 650px; padding: 40px; border-radius: 36px;
-  backdrop-filter: var(--blur); box-shadow: 0 20px 60px rgba(0,0,0,0.8);
-}
-.freeze-card {
-  background: rgba(10, 191, 255, 0.05); border: 1px solid rgba(10, 191, 255, 0.3);
-  box-shadow: inset 0 0 20px rgba(10, 191, 255, 0.1), 0 20px 60px rgba(0,0,0,0.8);
-}
-.maint-card {
-  background: rgba(255, 159, 10, 0.05); border: 1px solid rgba(255, 159, 10, 0.4); border-top: 4px solid #ff9f0a;
-  box-shadow: inset 0 0 20px rgba(255, 159, 10, 0.1), 0 20px 60px rgba(0,0,0,0.8);
-}
+.fullscreen-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; overflow: hidden; }
+#freezeScreen { background: radial-gradient(circle at center, rgba(10, 191, 255, 0.1) 0%, var(--bg-color) 80%); backdrop-filter: blur(10px) contrast(1.1); -webkit-backdrop-filter: blur(10px) contrast(1.1); }
+#maintenanceScreen { background: radial-gradient(circle at center, rgba(255, 159, 10, 0.08) 0%, var(--bg-color) 80%), repeating-linear-gradient(45deg, rgba(255, 159, 10, 0.03), rgba(255, 159, 10, 0.03) 10px, transparent 10px, transparent 20px); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.bg-massive-icon { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 280px; z-index: 1; user-select: none; }
+#freezeScreen .bg-massive-icon { opacity: 0.2; color: #0abfff; filter: drop-shadow(0 0 50px #0abfff); animation: spin 10s linear infinite; }
+#maintenanceScreen .bg-massive-icon { opacity: 0.15; color: #ff9f0a; filter: drop-shadow(0 0 40px #ff9f0a); animation: slowPulse 3s ease-in-out infinite; cursor: pointer; }
+.overlay-content-box { position: relative; z-index: 2; max-width: 650px; padding: 40px; border-radius: 36px; backdrop-filter: var(--blur); box-shadow: 0 20px 60px rgba(0,0,0,0.8); }
+.freeze-card { background: rgba(10, 191, 255, 0.05); border: 1px solid rgba(10, 191, 255, 0.3); box-shadow: inset 0 0 20px rgba(10, 191, 255, 0.1), 0 20px 60px rgba(0,0,0,0.8); }
+.maint-card { background: rgba(255, 159, 10, 0.05); border: 1px solid rgba(255, 159, 10, 0.4); border-top: 4px solid #ff9f0a; box-shadow: inset 0 0 20px rgba(255, 159, 10, 0.1), 0 20px 60px rgba(0,0,0,0.8); }
 .overlay-content-box h2 { margin: 0 0 16px 0; color: var(--text-primary); font-size: 28px; line-height: 1.3; font-weight: 700; letter-spacing: -0.02em; }
 .overlay-content-box p { margin: 0; color: var(--text-secondary); font-size: 16px; line-height: 1.5; font-weight: 500; }
 @keyframes slowPulse { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.05); } }
 
-/* ЛОАДЕР */
 .loader-container { margin: auto; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
 .infinity-loader { width: 80px; height: 40px; }
 .infinity-path-bg { fill: none; stroke: rgba(255, 255, 255, 0.1); stroke-width: 3; stroke-linecap: round; }
@@ -324,7 +292,6 @@ body {
 @keyframes dash { to { stroke-dashoffset: -100; } }
 .loader-text { font-size: 13px; font-weight: 600; color: var(--text-secondary); letter-spacing: 2px; }
 
-/* КОМПАКТНЫЙ DASHBOARD */
 .dashboard-layout { margin: auto; display: none; width: 100%; max-width: 1100px; gap: 20px; }
 .sidebar { flex: 0 0 250px; background: var(--card-bg); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); border: 1px solid var(--card-border); border-radius: 28px; padding: 20px; display: flex; flex-direction: column; box-shadow: var(--shadow-drop), var(--shadow-inner); }
 .sidebar h2 { margin: 0 0 16px 0; font-size: 14px; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1px; }
@@ -372,7 +339,6 @@ body {
 .support-btn { opacity: 0.5; }
 .support-btn:hover { opacity: 1; }
 
-/* АДМИН ПАНЕЛЬ */
 .dev-header { color: var(--success); font-weight: 700; margin-bottom: 12px; font-size: 18px; }
 .dev-table-wrapper { width: 100%; overflow-x: auto; margin-top: 12px; border-radius: 14px; border: 1px solid var(--card-border); }
 .dev-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; color: var(--text-primary); background: rgba(20,20,20,0.4); }
@@ -394,7 +360,6 @@ body {
 .web-log-error { color: #ff453a; }
 .web-log-service { color: #8e8e93; }
 
-/* ОБНОВЛЕННАЯ ВКЛАДКА SCRIPTS */
 .script-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 24px; overflow: hidden; display: flex; flex-direction: column; transition: transform 0.3s ease; }
 .script-card:hover { transform: scale(1.01); }
 .script-banner { width: 100%; height: 120px; background: url('https://static.wikia.nocookie.net/muscle-legends/images/5/50/Wiki-background/revision/latest/scale-to-width-down/670?cb=20210320061506') no-repeat center center, var(--input-bg); background-size: cover; position: relative; display: flex; justify-content: center; padding-top: 15px; }
@@ -409,7 +374,6 @@ body {
 .copy-btn { background: var(--accent); color: var(--accent-text); border: none; padding: 12px; border-radius: 14px; font-weight: 700; font-family: 'Inter', monospace; cursor: pointer; text-transform: uppercase; font-size: 13px; transition: all 0.3s ease; }
 .copy-btn:hover { transform: scale(1.02); }
 
-/* CUSTOM MODALS */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); z-index: 10000; display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: opacity 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .modal-overlay.active { opacity: 1; pointer-events: auto; }
 .custom-modal { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 28px; padding: 28px; width: 90%; max-width: 360px; text-align: center; box-shadow: var(--shadow-drop), var(--shadow-inner); transform: scale(0.9) translateY(20px); transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
@@ -425,10 +389,11 @@ body {
 .modal-btn-danger { background: var(--error); color: #fff; }
 .modal-btn-danger:hover { transform: scale(1.05); box-shadow: 0 8px 20px rgba(234, 21, 21, 0.3); }
 
-/* DISCORD CARD STYLING */
 .discord-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 16px; padding: 40px; }
 .discord-btn { width: 100%; max-width: 250px; padding: 14px; background: #5865F2; color: #fff; border: none; border-radius: 16px; font-size: 14px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); text-decoration: none;}
 .discord-btn:hover { transform: scale(1.05) translateY(-2px); box-shadow: 0 8px 20px rgba(88, 101, 242, 0.4); }
+
+.key-box { background: var(--input-bg); border: 1px solid var(--input-border); padding: 16px; border-radius: 16px; font-family: monospace; font-size: 18px; font-weight: 700; letter-spacing: 2px; text-align: center; color: var(--accent); margin: 12px 0; user-select: all; }
 
 @media (max-width: 900px) {
   .top-bar { padding: 16px 20px; } .dashboard-layout { flex-direction: column; width: 100%; padding: 0; }
@@ -441,13 +406,10 @@ body {
 </head>
 <body>
 
-  <!-- Глубокий атмосферный фон -->
   <div class="ambient-bg"></div>
-
   <canvas id="bgCanvas"></canvas>
   <div class="ocean"><div class="wave"></div><div class="wave"></div><div class="wave"></div></div>
 
-  <!-- Custom Confirm Modal -->
   <div class="modal-overlay" id="customModalOverlay">
     <div class="custom-modal">
       <h3 id="modalTitle">Title</h3>
@@ -459,7 +421,6 @@ body {
     </div>
   </div>
 
-  <!-- ЭКРАН ЗАМОРОЗКИ -->
   <div class="fullscreen-overlay" id="freezeScreen" style="display:none;">
       <div class="bg-massive-icon">❄️</div>
       <div class="overlay-content-box freeze-card">
@@ -468,7 +429,6 @@ body {
       </div>
   </div>
 
-  <!-- ЭКРАН ТЕХ. РАБОТ -->
   <div class="fullscreen-overlay" id="maintenanceScreen" style="display:none;">
       <div class="bg-massive-icon" id="maintenanceLockIcon">🔒</div>
       <div class="overlay-content-box maint-card">
@@ -479,7 +439,6 @@ body {
 
   <div class="top-bar">
     <div class="top-bar-left">
-      <!-- Выбор языка -->
       <div class="lang-dropdown-wrapper">
          <div class="ui-pill" id="langBtn" onclick="toggleLangMenu()"><span id="langBtnText">🌎 EN</span></div>
          <div class="lang-menu" id="langMenu">
@@ -505,7 +464,6 @@ body {
       <h1>Global Script's</h1>
     </div>
 
-    <!-- Форма Логина -->
     <div class="form-container" id="authForm" style="{{ 'display:none;' if current_user else 'display:flex;' }}">
       <input type="text" id="login" data-i18n-ph="login_ph" placeholder="Login" autocomplete="off" />
       <input type="password" id="password" data-i18n-ph="pass_ph" placeholder="Password" />
@@ -516,7 +474,6 @@ body {
       </div>
     </div>
 
-    <!-- Форма Секрета (Разработчик) -->
     <div class="form-container" id="secretForm" style="display:none;">
       <p class="form-header-text" data-i18n="dev_auth">Developer Authentication</p>
       <p style="font-size: 12px; color: var(--text-secondary); text-align: center; margin-top: 0;" data-i18n="dev_desc">Enter the secret codename to verify admin privileges.</p>
@@ -526,7 +483,6 @@ body {
       <div class="back-link" id="cancelSecretLink" data-i18n="cancel">Cancel</div>
     </div>
 
-    <!-- Форма 2FA -->
     <div class="form-container" id="twoFaForm" style="display:none;">
       <p class="form-header-text" data-i18n="bot_prot">Bot Protection</p>
       <p style="font-size: 12px; color: var(--text-secondary); text-align: center; margin-top: 0;" data-i18n="bot_desc">We sent a 6-digit code to your email. Valid for 15 minutes.</p>
@@ -536,7 +492,6 @@ body {
       <div class="back-link" id="cancel2FaLink" data-i18n="cancel">Cancel</div>
     </div>
 
-    <!-- Форма Регистрации -->
     <div class="form-container" id="regForm" style="display:none;">
       <p class="form-header-text" data-i18n="reg_desc">Describe yourself for the account.</p>
       <input type="text" id="regLogin" data-i18n-ph="login_ph" placeholder="Login" autocomplete="off" />
@@ -593,8 +548,13 @@ body {
           <h2 data-i18n="k_gen">Key Generator</h2>
           <div class="dashboard-card">
             <p style="color: var(--text-primary); font-weight: 600; font-size: 16px; margin-bottom: 8px;" data-i18n="k_unl">Unlock Free Access</p>
-            <p data-i18n="k_desc">Create unique HWID keys for your Roblox scripts.</p>
-            <button class="action-btn" style="margin-top: 10px;" data-i18n="k_btn">Generate New Key</button>
+            <p data-i18n="k_desc">Create unique HWID keys for your Roblox scripts. Keys last 12 hours. You can generate one every 24 hours.</p>
+            
+            <div id="generatedKeyDisplay" class="key-box" style="display:none;">GS-XXXX-XXXX-XXXX</div>
+            
+            <button class="action-btn" style="margin-top: 10px; width: 100%;" onclick="generateKey(false)" data-i18n="k_btn">Generate New Key</button>
+            <button class="action-btn danger-btn" id="devForceKeyBtn" style="display:none; margin-top: 10px; width: 100%;" onclick="generateKey(true)">FORCE GENERATE (DEV ONLY)</button>
+            <div id="keyMessage"></div>
           </div>
         </div>
 
@@ -642,7 +602,6 @@ body {
         
         <div class="tab-content" id="tab-faq"><h2 data-i18n="f_tit">FAQ</h2><div class="dashboard-card"><p data-i18n="f_desc">Got questions? We answer fast!</p></div></div>
         
-        <!-- Вкладка Developers -->
         <div class="tab-content" id="tab-developers">
           <h2 data-i18n="d_tit">Developers</h2>
           <div class="dashboard-card" id="devUserView">
@@ -672,7 +631,6 @@ body {
                 </div>
              </div>
              
-             <!-- Интеграция Discord -->
              <div class="dashboard-card">
                 <h4 style="margin: 0 0 10px 0; color: var(--text-primary);">Discord Integration</h4>
                 <p style="margin-top:0; font-size: 13px; color: var(--text-secondary);">Update the active Discord server invite link.</p>
@@ -690,7 +648,6 @@ body {
           </div>
         </div>
         
-        <!-- НОВАЯ ВКЛАДКА DISCORD -->
         <div class="tab-content" id="tab-discord">
           <h2 data-i18n="c_tit">Community</h2>
           <div class="dashboard-card discord-card">
@@ -707,7 +664,6 @@ body {
   </div>
 
 <script>
-  // --- ТРАНСЛЯЦИЯ ЯЗЫКОВ (i18n) ---
   const i18n = {
     en: {
       theme_btn: "Light Mode", logout: "Logout", auth_btn: "AUTHORIZE", no_acc: "Don't have an account? Create it!",
@@ -722,7 +678,7 @@ body {
       m_dev: "DEVELOPERS", m_dev_d: "Website and script creators.", m_disc: "DISCORD", m_disc_d: "We're also in chat!",
       u_prof: "User Profile", acc_det: "Account Details", acc_det_d: "Here is your personal overview registered in the system.",
       l_login: "LOGIN", l_plan: "CURRENT PLAN", l_reg: "REGISTRATION DATE", l_dev: "DEVELOPER APPROVED",
-      k_gen: "Key Generator", k_unl: "Unlock Free Access", k_desc: "Create unique HWID keys for your Roblox scripts.", k_btn: "Generate New Key",
+      k_gen: "Key Generator", k_unl: "Unlock Free Access", k_desc: "Create unique HWID keys for your Roblox scripts. Keys last 12 hours. You can generate one every 24 hours.", k_btn: "Generate New Key",
       s_lib: "Scripts Library", s_good: "Good script, works in beta version. There are some bugs or errors. They say it will be updated.",
       s_copy: "CLICK TO COPY LUA SCRIPT", p_upg: "Upgrade Plans", p_buy: "Buy Plan", p_my: "My Current Plan",
       p_start: "Starter Plan", p_start_d: "Little access, but works perfectly for beginners.",
@@ -751,7 +707,7 @@ body {
       m_dev: "РАЗРАБОТЧИКИ", m_dev_d: "Создатели сайта и скриптов.", m_disc: "DISCORD", m_disc_d: "Мы также есть в чате!",
       u_prof: "Профиль", acc_det: "Детали Аккаунта", acc_det_d: "Ваша личная информация в системе.",
       l_login: "ЛОГИН", l_plan: "ТЕКУЩИЙ ПЛАН", l_reg: "ДАТА РЕГИСТРАЦИИ", l_dev: "ОДОБРЕН РАЗРАБОТЧИКОМ",
-      k_gen: "Генератор Ключей", k_unl: "Разблокировать Доступ", k_desc: "Создайте уникальные HWID ключи для Roblox.", k_btn: "Сгенерировать Ключ",
+      k_gen: "Генератор Ключей", k_unl: "Разблокировать Доступ", k_desc: "Создайте уникальные HWID ключи для Roblox. Действуют 12ч (раз в 24ч).", k_btn: "Сгенерировать Ключ",
       s_lib: "Библиотека Скриптов", s_good: "Хороший скрипт, работает в бета версии. Есть ошибки. Говорят, обновят и будет лучшим.",
       s_copy: "НАЖМИТЕ ДЛЯ КОПИРОВАНИЯ LUA", p_upg: "Планы Улучшений", p_buy: "Купить План", p_my: "Мой План",
       p_start: "Начальный План", p_start_d: "Мало доступа, но отлично работает для новичков.",
@@ -780,7 +736,7 @@ body {
       m_dev: "開発者", m_dev_d: "クリエイター。", m_disc: "DISCORD", m_disc_d: "チャットにもいます！",
       u_prof: "プロフィール", acc_det: "アカウント詳細", acc_det_d: "あなたのシステム情報です。",
       l_login: "ログイン", l_plan: "現在のプラン", l_reg: "登録日", l_dev: "開発者承認",
-      k_gen: "キー生成", k_unl: "無料アクセス", k_desc: "独自のHWIDキーを作成。", k_btn: "キーを生成",
+      k_gen: "キー生成", k_unl: "無料アクセス", k_desc: "HWIDキーを作成。有効期限12時間（24時間に1回）", k_btn: "キーを生成",
       s_lib: "スクリプトライブラリ", s_good: "ベータ版で動作します。バグがあります。",
       s_copy: "LUAをコピー", p_upg: "プラン", p_buy: "プラン購入", p_my: "現在のプラン",
       p_start: "スターター", p_start_d: "初心者向けです。",
@@ -809,7 +765,7 @@ body {
       m_dev: "DEVS", m_dev_d: "Criadores.", m_disc: "DISCORD", m_disc_d: "Junte-se ao chat!",
       u_prof: "Perfil", acc_det: "Detalhes da Conta", acc_det_d: "Sua visão geral.",
       l_login: "LOGIN", l_plan: "PLANO ATUAL", l_reg: "REGISTRO", l_dev: "APROVADO",
-      k_gen: "Gerador", k_unl: "Desbloquear Acesso", k_desc: "Crie chaves HWID.", k_btn: "Gerar Chave",
+      k_gen: "Gerador", k_unl: "Desbloquear Acesso", k_desc: "Crie chaves HWID. Válidas por 12h (1 por 24h).", k_btn: "Gerar Chave",
       s_lib: "Biblioteca", s_good: "Bom script, funciona na versão beta. Contém bugs.",
       s_copy: "COPIAR LUA", p_upg: "Planos", p_buy: "Comprar Plano", p_my: "Meu Plano",
       p_start: "Inicial", p_start_d: "Bom para iniciantes.",
@@ -848,7 +804,6 @@ body {
     document.getElementById('langMenu').classList.toggle('show');
   }
 
-  // --- КАСТОМНЫЕ МОДАЛЬНЫЕ ОКНА ---
   let confirmActionCallback = null;
 
   function showConfirm(title, message, confirmText, isDanger, callback, hideCancel = false) {
@@ -887,6 +842,24 @@ body {
     setTimeout(() => { btn.innerText = original; btn.style.opacity = "0.5"; }, 3000);
   }
 
+  // --- ЛОГИКА ГЕНЕРАЦИИ КЛЮЧА ---
+  function generateKey(forceOverride) {
+      fetch('/generate_key', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ force: forceOverride })
+      }).then(res => res.json()).then(data => {
+          if(data.success) {
+              const display = document.getElementById('generatedKeyDisplay');
+              display.innerText = data.key;
+              display.style.display = 'block';
+              showMessage('keyMessage', 'Key generated successfully! Valid for 12 hours.', true);
+          } else {
+              showConfirm('Cooldown Active', data.message, 'OK', false, null, true);
+          }
+      });
+  }
+
   function requestRestartPlan() {
     showConfirm('Restart Plan', 'Are you sure you want to restart your current plan?', 'Restart', false, () => {
         fetch('/restart_plan', { method: 'POST' }).then(res => res.json()).then(data => {
@@ -912,6 +885,9 @@ body {
   let isSiteMaintenance = false;
   function loadAdminPanel(devApproved) {
      if (devApproved !== 'Yes') return;
+     
+     document.getElementById('devForceKeyBtn').style.display = 'block';
+     
      document.getElementById('devUserView').style.display = 'none'; document.getElementById('devAdminView').style.display = 'flex';
      refreshAdminData(); setInterval(refreshConsoleLogs, 3000);
   }
@@ -970,7 +946,6 @@ body {
     });
   }
 
-  // LIQUID PHYSICS
   const canvas = document.getElementById('bgCanvas'); const ctx = canvas.getContext('2d');
   let width, height, particles = [], mouse = { x: -1000, y: -1000 }, currentDotColor = 'rgba(255, 255, 255, 0.3)', isErrorState = false, globalSpeedBoost = 0, isSystemLoading = false; 
   function updateCanvasColor() { currentDotColor = getComputedStyle(document.body).getPropertyValue('--dot-color').trim(); }
@@ -1019,7 +994,6 @@ body {
   sidebarBtns.forEach(btn => btn.addEventListener('click', () => switchTab(btn.getAttribute('data-target'))));
   document.getElementById('userDisplay').addEventListener('click', () => switchTab('tab-main'));
 
-  // ЛОГИКА ДИНАМИЧЕСКОГО ЛОАДЕРА
   const loadingTexts = ["Authenticating System...", "Decrypting Data...", "Connecting to Mainframe...", "Loading Modules...", "Unlocking Interface..."];
   let loadingInterval;
   function showLoadingScreen() {
@@ -1029,7 +1003,6 @@ body {
   }
   function hideLoadingScreen() { document.getElementById('loaderScreen').style.display = 'none'; isSystemLoading = false; clearInterval(loadingInterval); }
 
-  // --- ГЛОБАЛЬНЫЙ ИНИТ И ЛОГИКА ---
   document.addEventListener('DOMContentLoaded', () => {
     
     const savedLang = localStorage.getItem('lang') || 'en';
@@ -1093,6 +1066,14 @@ body {
         fetch('/get_user_info').then(res => res.json()).then(data => {
             if(data.success) {
                 if(data.is_frozen === 'Yes') { window.location.reload(); }
+                
+                // Отображение активного ключа, если он есть
+                if(data.active_key) {
+                    const display = document.getElementById('generatedKeyDisplay');
+                    display.innerText = data.active_key;
+                    display.style.display = 'block';
+                }
+                
                 document.getElementById('userDisplay').innerText = data.login;
                 document.getElementById('profileLogin').innerText = data.login;
                 document.getElementById('profilePlan').innerText = data.plan;
@@ -1200,8 +1181,20 @@ def get_user_info():
         c_log('WARNING', "Unauthorized attempt to fetch user info.")
         return jsonify({'success': False})
     
+    tz = pytz.timezone('Europe/Moscow')
+    now = datetime.now(tz)
+    
     conn = get_db_connection()
     user = conn.execute("SELECT * FROM users WHERE login = ?", (current_user,)).fetchone()
+    
+    # Ищем последний ключ пользователя и проверяем, жив ли он
+    active_key = None
+    latest_key_row = conn.execute("SELECT key_code, expires_at FROM keys WHERE user_login = ? ORDER BY id DESC LIMIT 1", (current_user,)).fetchone()
+    if latest_key_row:
+        expires_time = datetime.strptime(latest_key_row['expires_at'], '%d.%m.%Y %H:%M:%S').replace(tzinfo=tz)
+        if now <= expires_time:
+            active_key = latest_key_row['key_code']
+            
     conn.close()
 
     if user:
@@ -1223,6 +1216,7 @@ def get_user_info():
             'reg_date': user['reg_date'],
             'dev_approved': user['dev_approved'],
             'is_frozen': user['is_frozen'],
+            'active_key': active_key,
             'greeting': random.choice(greetings),
             'dev_greeting': random.choice(dev_greetings)
         })
@@ -1365,7 +1359,112 @@ def register():
     c_log('SUCCESS', f"New account created successfully for {login_input}.")
     return jsonify({'success': True})
 
-# --- МАРШРУТЫ АДМИН-ПАНЕЛИ (ADMIN API) ---
+# --- ЭНДПОИНТ ГЕНЕРАЦИИ КЛЮЧА ---
+@app.route('/generate_key', methods=['POST'])
+def generate_key():
+    current_user = session.get('user')
+    if not current_user:
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+
+    force_override = request.get_json().get('force', False)
+    tz = pytz.timezone('Europe/Moscow')
+    now = datetime.now(tz)
+    
+    conn = get_db_connection()
+    user = conn.execute("SELECT plan, dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
+    
+    if not force_override:
+        last_key = conn.execute("SELECT created_at FROM keys WHERE user_login = ? ORDER BY id DESC LIMIT 1", (current_user,)).fetchone()
+        if last_key:
+            last_time = datetime.strptime(last_key['created_at'], '%d.%m.%Y %H:%M:%S').replace(tzinfo=tz)
+            if now < last_time + timedelta(hours=24):
+                time_left = (last_time + timedelta(hours=24)) - now
+                hours, remainder = divmod(time_left.seconds, 3600)
+                minutes, _ = divmod(remainder, 60)
+                conn.close()
+                return jsonify({'success': False, 'message': f'Please wait {hours}h {minutes}m before generating a new key.'})
+
+    # Определение префикса по плану
+    plan = user['plan']
+    prefix = "FREE"
+    if 'Starter' in plan: prefix = "STARTER"
+    elif 'Professional' in plan: prefix = "PRO"
+    elif 'Extreme' in plan: prefix = "EXTREME"
+    elif 'Developer' in plan: prefix = "DEV"
+
+    part1 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    part2 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    part3 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    part4 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    key_code = f"{prefix}_GS-{part1}-{part2}-{part3}-{part4}"
+
+    created_at = now.strftime('%d.%m.%Y %H:%M:%S')
+    if 'Free' in user['plan']:
+        expires_at = (now + timedelta(hours=12)).strftime('%d.%m.%Y %H:%M:%S')
+    else:
+        expires_at = (now + timedelta(days=90)).strftime('%d.%m.%Y %H:%M:%S')
+
+    conn.execute('''
+        INSERT INTO keys (key_code, user_login, plan, created_at, expires_at)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (key_code, current_user, user['plan'], created_at, expires_at))
+    conn.commit()
+    conn.close()
+
+    if force_override: c_log('WARNING', f"Developer '{current_user}' bypassed cooldown and generated key: {key_code}")
+    else: c_log('SUCCESS', f"User '{current_user}' generated new key: {key_code}")
+        
+    return jsonify({'success': True, 'key': key_code})
+
+# --- ПУБЛИЧНЫЙ API ДЛЯ ROBLOX LUA ---
+@app.route('/api/verify_key', methods=['POST', 'GET'])
+def api_verify_key():
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        key_input = data.get('key', '').strip()
+        hwid_input = data.get('hwid', '').strip()
+    else:
+        key_input = request.args.get('key', '').strip()
+        hwid_input = request.args.get('hwid', '').strip()
+
+    if not key_input: return jsonify({'valid': False, 'message': 'No key provided.'})
+
+    conn = get_db_connection()
+    key_row = conn.execute("SELECT * FROM keys WHERE key_code = ?", (key_input,)).fetchone()
+    
+    if not key_row:
+        conn.close()
+        c_log('WARNING', f"Roblox API: Invalid key attempt -> {key_input}")
+        return jsonify({'valid': False, 'message': 'Invalid key!'})
+
+    tz = pytz.timezone('Europe/Moscow')
+    now = datetime.now(tz)
+    expires_time = datetime.strptime(key_row['expires_at'], '%d.%m.%Y %H:%M:%S').replace(tzinfo=tz)
+    
+    if now > expires_time:
+        conn.close()
+        c_log('WARNING', f"Roblox API: Expired key attempt -> {key_input}")
+        return jsonify({'valid': False, 'message': 'Key has expired! Please generate a new one on the website.'})
+
+    user_row = conn.execute("SELECT is_frozen FROM users WHERE login = ?", (key_row['user_login'],)).fetchone()
+    if user_row and user_row['is_frozen'] == 'Yes':
+        conn.close()
+        c_log('WARNING', f"Roblox API: Frozen user key attempt -> {key_row['user_login']}")
+        return jsonify({'valid': False, 'message': 'User account is frozen!'})
+
+    if key_row['hwid'] == '':
+        conn.execute("UPDATE keys SET hwid = ? WHERE key_code = ?", (hwid_input, key_input))
+        conn.commit()
+    elif hwid_input and key_row['hwid'] != hwid_input:
+        conn.close()
+        c_log('ERROR', f"Roblox API: HWID Mismatch for key {key_input}")
+        return jsonify({'valid': False, 'message': 'HWID Mismatch! Key bound to another PC.'})
+
+    conn.close()
+    c_log('SUCCESS', f"Roblox API: Key verified -> {key_input} ({key_row['user_login']})")
+    return jsonify({'valid': True, 'user': key_row['user_login'], 'plan': key_row['plan'], 'expires': key_row['expires_at'], 'message': 'Access Granted!'})
+
+# --- МАРШРУТЫ АДМИН-ПАНЕЛИ ---
 @app.route('/admin/get_users')
 def admin_get_users():
     current_user = session.get('user')
@@ -1389,9 +1488,7 @@ def admin_get_logs():
     conn = get_db_connection()
     check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
     conn.close()
-    if not check or check['dev_approved'] != 'Yes':
-        return jsonify({'success': False}), 403
-        
+    if not check or check['dev_approved'] != 'Yes': return jsonify({'success': False}), 403
     return jsonify({'success': True, 'logs': LIVE_LOGS})
 
 @app.route('/admin/change_plan', methods=['POST'])
@@ -1399,13 +1496,10 @@ def admin_change_plan():
     current_user = session.get('user')
     conn = get_db_connection()
     check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
-    if not check or check['dev_approved'] != 'Yes':
-        conn.close()
-        return jsonify({'success': False}), 403
+    if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
         
     data = request.get_json()
-    target_user = data.get('login')
-    new_plan = data.get('plan')
+    target_user = data.get('login'); new_plan = data.get('plan')
     
     days = 0
     if 'Starter' in new_plan: days = 7
@@ -1415,7 +1509,6 @@ def admin_change_plan():
     conn.execute("UPDATE users SET plan = ?, plan_days = ? WHERE login = ?", (new_plan, days, target_user))
     conn.commit()
     conn.close()
-    
     c_log('WARNING', f"Developer '{current_user}' updated '{target_user}' plan to '{new_plan}' ({days} days).")
     return jsonify({'success': True})
 
@@ -1424,9 +1517,7 @@ def admin_add_days():
     current_user = session.get('user')
     conn = get_db_connection()
     check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
-    if not check or check['dev_approved'] != 'Yes':
-        conn.close()
-        return jsonify({'success': False}), 403
+    if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
         
     data = request.get_json()
     target_user = data.get('login')
@@ -1434,7 +1525,6 @@ def admin_add_days():
     conn.execute("UPDATE users SET plan_days = plan_days + 7 WHERE login = ?", (target_user,))
     conn.commit()
     conn.close()
-    
     c_log('WARNING', f"Developer '{current_user}' added +7 days to user '{target_user}'.")
     return jsonify({'success': True})
 
@@ -1443,16 +1533,13 @@ def admin_toggle_freeze():
     current_user = session.get('user')
     conn = get_db_connection()
     check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
-    if not check or check['dev_approved'] != 'Yes':
-        conn.close()
-        return jsonify({'success': False}), 403
+    if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
         
     data = request.get_json()
     target_user = data.get('login')
     
     if target_user == current_user:
-        conn.close()
-        return jsonify({'success': False, 'message': 'You cannot freeze your own developer account!'})
+        conn.close(); return jsonify({'success': False, 'message': 'You cannot freeze your own developer account!'})
         
     target_data = conn.execute("SELECT is_frozen FROM users WHERE login = ?", (target_user,)).fetchone()
     new_status = 'No' if target_data['is_frozen'] == 'Yes' else 'Yes'
@@ -1460,7 +1547,6 @@ def admin_toggle_freeze():
     conn.execute("UPDATE users SET is_frozen = ? WHERE login = ?", (new_status, target_user))
     conn.commit()
     conn.close()
-    
     c_log('WARNING', f"Developer '{current_user}' changed freeze status of '{target_user}' to {new_status}.")
     return jsonify({'success': True})
 
@@ -1469,9 +1555,7 @@ def admin_toggle_maintenance():
     current_user = session.get('user')
     conn = get_db_connection()
     check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
-    if not check or check['dev_approved'] != 'Yes':
-        conn.close()
-        return jsonify({'success': False}), 403
+    if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
         
     m_data = conn.execute("SELECT value FROM settings WHERE key = 'maintenance'").fetchone()
     new_val = 'No' if m_data and m_data['value'] == 'Yes' else 'Yes'
@@ -1479,7 +1563,6 @@ def admin_toggle_maintenance():
     conn.execute("UPDATE settings SET value = ? WHERE key = 'maintenance'", (new_val,))
     conn.commit()
     conn.close()
-    
     c_log('WARNING', f"Developer '{current_user}' toggled Site Maintenance mode to: {new_val}.")
     return jsonify({'success': True})
 
@@ -1488,22 +1571,18 @@ def admin_delete_user():
     current_user = session.get('user')
     conn = get_db_connection()
     check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
-    if not check or check['dev_approved'] != 'Yes':
-        conn.close()
-        return jsonify({'success': False}), 403
+    if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
         
     data = request.get_json()
     target_user = data.get('login')
     
     if target_user == current_user:
-        conn.close()
-        return jsonify({'success': False, 'message': 'You cannot delete your own admin account!'})
+        conn.close(); return jsonify({'success': False, 'message': 'You cannot delete your own admin account!'})
         
     conn.execute("DELETE FROM users WHERE login = ?", (target_user,))
     conn.commit()
     conn.close()
-    
-    c_log('ERROR', f"Developer '{current_user}' permanently deleted account '{target_user}' from system database.")
+    c_log('ERROR', f"Developer '{current_user}' permanently deleted account '{target_user}'.")
     return jsonify({'success': True})
 
 @app.route('/admin/update_discord', methods=['POST'])
@@ -1511,15 +1590,12 @@ def admin_update_discord():
     current_user = session.get('user')
     conn = get_db_connection()
     check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
-    if not check or check['dev_approved'] != 'Yes':
-        conn.close()
-        return jsonify({'success': False}), 403
+    if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
         
     new_link = request.get_json().get('link', '').strip()
     conn.execute("UPDATE settings SET value = ? WHERE key = 'discord_link'", (new_link,))
     conn.commit()
     conn.close()
-    
     c_log('WARNING', f"Developer '{current_user}' updated Discord link to: {new_link}")
     return jsonify({'success': True})
 
