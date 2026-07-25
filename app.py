@@ -97,7 +97,6 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id INTEGER NOT NULL, sender TEXT NOT NULL,
             message TEXT NOT NULL, sent_at TEXT NOT NULL)''')
 
-    # ТАБЛИЦА СКРИПТОВ
     conn.execute('''CREATE TABLE IF NOT EXISTS scripts (
             id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, game TEXT NOT NULL,
             banner_url TEXT NOT NULL, release_date TEXT NOT NULL, script_code TEXT NOT NULL, 
@@ -129,7 +128,11 @@ def init_db():
 
 init_db()
 
-# --- ПОЛНЫЙ HTML ШАБЛОН ---
+@app.route('/anypay-verification.txt')
+@app.route('/7641a8b9610252ee169f2815a5c2.txt')
+def anypay_txt_verify():
+    return "7641a8b9610252ee169f2815a5c2", 200, {'Content-Type': 'text/plain'}
+
 TEMPLATE = '''
 <!DOCTYPE html>
 <html lang="en">
@@ -138,37 +141,106 @@ TEMPLATE = '''
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="anypay-verification" content="7641a8b9610252ee169f2815a5c2" />
 <title>Global Script's Hub</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<!-- Подключение Lucide Icons через JSDelivr (защита от блокировок) -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
 <style>
 :root {
   --bg-color: #000000; --text-primary: #ffffff; --text-secondary: #888888;
-  --card-bg: linear-gradient(135deg, rgba(30, 30, 32, 0.6), rgba(20, 20, 22, 0.4));
+  --card-bg: rgba(20, 20, 25, 0.4);
   --card-border: rgba(255, 255, 255, 0.08); --input-bg: rgba(255, 255, 255, 0.05);
   --input-border: rgba(255, 255, 255, 0.12); --accent: #ffffff; --accent-text: #000000;
-  --error: #ea1515; --success: #34c759; --shadow-drop: 0 12px 30px rgba(0, 0, 0, 0.6);
-  --shadow-inner: inset 0 1px 1px rgba(255, 255, 255, 0.1); --blur: blur(28px) saturate(180%);
+  --error: #ea1515; --success: #34c759; 
+  --shadow-drop: 0 15px 35px rgba(0,0,0,0.4);
+  --shadow-inner: inset 0 1px 1px rgba(255, 255, 255, 0.1); 
+  --blur: blur(20px) saturate(150%);
   --dot-color: rgba(255, 255, 255, 0.3); --wave-1: rgba(255, 255, 255, 0.03);
   --wave-2: rgba(255, 255, 255, 0.015); --wave-3: rgba(255, 255, 255, 0.005);
 }
 
 [data-theme="light"] {
   --bg-color: #f5f5f7; --text-primary: #1d1d1f; --text-secondary: #86868b;
-  --card-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.4));
+  --card-bg: rgba(255, 255, 255, 0.5);
   --card-border: rgba(0, 0, 0, 0.05); --input-bg: rgba(255, 255, 255, 0.6);
   --input-border: rgba(0, 0, 0, 0.08); --accent: #1d1d1f; --accent-text: #ffffff;
   --shadow-drop: 0 12px 30px rgba(0, 0, 0, 0.08); --shadow-inner: inset 0 1px 1px rgba(255, 255, 255, 0.8);
   --dot-color: rgba(0, 0, 0, 0.2); --wave-1: rgba(0, 0, 0, 0.03); --wave-2: rgba(0, 0, 0, 0.015); --wave-3: rgba(0, 0, 0, 0.005);
 }
 
+/* Инверсия логотипа при белой теме */
+[data-theme="light"] .header img {
+  filter: invert(1);
+}
+
 * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
 html, body { height: 100%; min-height: 100vh; margin: 0; padding: 0; }
-body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-primary); transition: all 0.6s ease; overflow-x: hidden; overflow-y: auto; background-attachment: fixed; animation: globalFocus 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-@keyframes globalFocus { 0% { filter: blur(20px); transform: scale(1.05); } 100% { filter: blur(0px); transform: scale(1); } }
+body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-primary); transition: background-color 0.6s ease, color 0.6s ease; overflow-x: hidden; overflow-y: auto; background-attachment: fixed; perspective: 1000px; }
 
+/* -------------------------------------
+   DRAGON INTRO (Неоновая длинная сосиска)
+-------------------------------------- */
+#introOverlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 99999; display: flex; justify-content: center; align-items: center; overflow: hidden; transition: opacity 0.8s ease, visibility 0.8s; }
+.dragon-container { display: flex; flex-direction: column; align-items: center; gap: 30px; width: 100%; }
+.dragon-container h2 { color: #fff; font-weight: 800; letter-spacing: 10px; font-size: 32px; margin: 0; text-shadow: 0 0 20px rgba(255,255,255,0.5); }
+
+.dragon-track { position: relative; width: 400px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; }
+.white-dragon { position: absolute; top: 0; left: -250px; width: 200px; height: 100%; background: linear-gradient(90deg, transparent, #ffffff, #ffffff); box-shadow: 0 0 20px #ffffff, 0 0 40px #ffffff; border-radius: 4px; animation: dragonFlight 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+@keyframes dragonFlight { 0% { left: -250px; } 100% { left: 400px; } }
+
+/* -------------------------------------
+   PARTICLE BURST (Nothing Style)
+-------------------------------------- */
+button { position: relative; overflow: hidden; }
+.btn-particle {
+    position: absolute;
+    width: 6px; height: 6px;
+    background: var(--text-primary);
+    border-radius: 50%;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    animation: particleBurst 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    z-index: 10;
+}
+.login-to-start-btn .btn-particle, .action-btn:not(.modal-btn-cancel) .btn-particle, .copy-btn:not(:disabled) .btn-particle { background: var(--bg-color); }
+@keyframes particleBurst {
+    0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(0); opacity: 0; }
+}
+
+/* -------------------------------------
+   LANDING PREVIEW (Glassmorphism & Tilt)
+-------------------------------------- */
+#landingWrapper { display: none; flex-direction: column; align-items: center; width: 100%; min-height: 100vh; padding: 100px 20px 40px; animation: fadeInLanding 1s ease forwards; position: relative; z-index: 10; transition: opacity 0.6s ease; }
+@keyframes fadeInLanding { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.landing-hero { text-align: center; max-width: 800px; margin-top: 40px; margin-bottom: 50px; }
+.landing-hero h1 { font-size: 64px; font-weight: 800; letter-spacing: -0.04em; margin-bottom: 20px; background: linear-gradient(135deg, #fff 30%, #888); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.landing-hero p { font-size: 20px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 40px; }
+.feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; width: 100%; max-width: 1100px; margin-bottom: 60px; perspective: 1200px; }
+
+/* 3D Glassmorphism Cards - Фиксируем базовое состояние, чтобы не дергались */
+.feature-box, .script-card, .plan-card, .dashboard-card {
+    background: var(--card-bg);
+    backdrop-filter: var(--blur);
+    border: 1px solid var(--card-border);
+    border-radius: 24px;
+    box-shadow: var(--shadow-drop), var(--shadow-inner);
+    padding: 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    text-align: left;
+    transform: perspective(1200px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1);
+    transition: transform 0.4s ease-out, box-shadow 0.4s ease;
+    transform-style: preserve-3d; 
+    will-change: transform;
+}
+.feature-box h3, .feature-box p, .script-header, .plan-card h4, .plan-card .price { transform: translateZ(20px); }
+.feature-box i { transform: translateZ(30px); }
+
+.login-to-start-btn { padding: 18px 54px; font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: var(--accent-text); background: var(--accent); border: none; border-radius: 99px; cursor: pointer; box-shadow: 0 10px 30px rgba(255,255,255,0.2); transition: all 0.3s; transform-style: preserve-3d; }
+.login-to-start-btn:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 15px 40px rgba(255,255,255,0.4); }
+
+/* STANDARD APP UI */
 .ambient-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -3; background: radial-gradient(circle at 15% 30%, rgba(40, 40, 45, 0.4) 0%, transparent 50%), radial-gradient(circle at 85% 80%, rgba(30, 30, 35, 0.4) 0%, transparent 50%); filter: blur(40px); opacity: 0; animation: ambientFade 3s ease-in-out 0.5s forwards; pointer-events: none; }
-[data-theme="light"] .ambient-bg { background: radial-gradient(circle at 15% 30%, rgba(200, 200, 220, 0.4) 0%, transparent 50%), radial-gradient(circle at 85% 80%, rgba(180, 180, 200, 0.4) 0%, transparent 50%); }
 @keyframes ambientFade { to { opacity: 1; } }
 
 #bgCanvas { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -2; opacity: 0; animation: fadeInCanvas 2s ease-in-out forwards; pointer-events: none; }
@@ -179,8 +251,8 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
 @keyframes drift { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes fadeInCanvas { to { opacity: 1; } }
 
-.app-content { opacity: 0; display: flex; flex-direction: column; align-items: center; width: 100%; min-height: 100vh; padding: 100px 20px 40px 20px; animation: liquidReveal 1s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards; }
-@keyframes liquidReveal { 0% { opacity: 0; transform: translateY(20px) scale(0.99); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+.app-content { display: none; flex-direction: column; align-items: center; width: 100%; min-height: 100vh; padding: 100px 20px 40px 20px; animation: liquidReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+@keyframes liquidReveal { 0% { opacity: 0; transform: translateY(20px) scale(0.98); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes elasticBounce { 0% { transform: scale(0.97) translateY(10px); opacity: 0; } 50% { transform: scale(1.01) translateY(-2px); opacity: 1; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
 @keyframes errorShake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
 .shake-error { animation: errorShake 0.4s forwards; }
@@ -263,17 +335,15 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
 .tab-content.active { display: flex; animation: elasticBounce 0.6s forwards; }
 .tab-content h2 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; display: flex; align-items: center; gap: 10px;}
 
-.dashboard-card { background: var(--card-bg); backdrop-filter: var(--blur); border: 1px solid var(--card-border); border-radius: 28px; padding: 26px; box-shadow: var(--shadow-drop); color: var(--text-secondary); font-size: 14px; line-height: 1.6; display: flex; flex-direction: column; }
-
 .plans-switch { display: flex; gap: 8px; background: var(--input-bg); padding: 6px; border-radius: 20px; border: 1px solid var(--input-border); margin-bottom: 10px; }
 .plan-sub-btn { flex: 1; background: transparent; color: var(--text-secondary); border: none; padding: 12px; border-radius: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
 .plan-sub-btn.active { background: var(--card-border); color: var(--text-primary); box-shadow: var(--shadow-drop); transform: scale(1.03); }
 
 .plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
-.plan-card { background: var(--input-bg); border: 1px solid var(--input-border); padding: 20px; border-radius: 20px; display: flex; flex-direction: column; gap: 10px; transition: transform 0.3s; }
-.plan-card:hover { transform: scale(1.03) translateY(-4px); }
-.plan-card h4 { margin: 0; font-size: 17px; color: var(--text-primary); }
-.plan-card .price { font-size: 12px; color: var(--accent); font-weight: 700; }
+.plan-card { padding: 0; overflow: hidden; justify-content: space-between; }
+.plan-card-content { padding: 24px; display: flex; flex-direction: column; gap: 12px; height: 100%; }
+.plan-card h4 { margin: 0; font-size: 18px; color: var(--text-primary); }
+.plan-card .price { font-size: 14px; color: var(--accent); font-weight: 700; }
 
 .profile-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 12px; }
 .profile-item { background: var(--input-bg); border: 1px solid var(--input-border); padding: 14px; border-radius: 14px; display: flex; flex-direction: column; gap: 4px; }
@@ -281,10 +351,9 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
 .profile-value { font-size: 15px; font-weight: 600; color: var(--text-primary); }
 
 .action-btn { background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 12px 18px; border-radius: 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: flex; align-items: center; justify-content: center; gap: 8px;}
-.action-btn:hover { background: var(--card-border); transform: scale(1.03); box-shadow: 0 6px 15px rgba(0,0,0,0.2); }
+.action-btn:hover { background: var(--card-border); transform: translateZ(10px) scale(1.03); box-shadow: 0 6px 15px rgba(0,0,0,0.2); }
 .danger-btn { color: var(--error); } .danger-btn:hover { background: rgba(234, 21, 21, 0.1); border-color: var(--error); }
 
-.dev-header { color: var(--success); font-weight: 700; margin-bottom: 12px; font-size: 18px; }
 .dev-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; color: var(--text-primary); background: rgba(20,20,20,0.4); border-radius: 14px; overflow: hidden; }
 .dev-table th, .dev-table td { padding: 10px 14px; border-bottom: 1px solid var(--card-border); }
 .dev-select { background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--card-border); padding: 10px; border-radius: 10px; outline: none; font-family: inherit; font-size: 12px; width: 100%; }
@@ -296,16 +365,15 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
 .web-log-info { color: #ffffff; } .web-log-success { color: #34c759; } .web-log-warning { color: #ff9f0a; } .web-log-error { color: #ff453a; } .web-log-service { color: #8e8e93; }
 
 .scripts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; width: 100%; }
-.script-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 24px; overflow: hidden; display: flex; flex-direction: column; transition: transform 0.3s; box-shadow: var(--shadow-drop); }
-.script-card:hover { transform: scale(1.02); }
-.script-banner { width: 100%; height: 140px; background-size: cover; background-position: center; position: relative; display: flex; justify-content: center; padding-top: 15px; }
-.script-banner::after { content: ''; position: absolute; bottom: -1px; left: 0; width: 100%; height: 80px; background: linear-gradient(to bottom, transparent, var(--card-bg)); opacity: 1; }
-.script-content { padding: 0 20px 20px 20px; position: relative; z-index: 2; display: flex; flex-direction: column; gap: 8px; flex: 1; }
-.script-header h3 { margin: 0; font-size: 18px; color: var(--text-primary); display: flex; flex-direction: column; gap: 2px; }
-.game-tag { font-size: 11px; font-weight: 600; opacity: 0.6; text-transform: uppercase; letter-spacing: 1px;}
+.script-card { padding: 0; }
+.script-banner { width: 100%; height: 160px; background-size: cover; background-position: center; position: relative; }
+.script-banner::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 80px; background: linear-gradient(to bottom, transparent, var(--card-bg)); opacity: 1; }
+.script-content { padding: 20px; position: relative; z-index: 2; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.script-header h3 { margin: 0; font-size: 20px; color: var(--text-primary); display: flex; flex-direction: column; gap: 4px; }
+.game-tag { font-size: 11px; font-weight: 700; opacity: 0.6; text-transform: uppercase; letter-spacing: 1px;}
 .script-desc { margin: 0; font-size: 13px; color: var(--text-secondary); line-height: 1.5; flex: 1; }
-.copy-btn { background: var(--accent); color: var(--accent-text); border: none; padding: 12px; border-radius: 14px; font-weight: 700; font-family: 'Inter', monospace; cursor: pointer; text-transform: uppercase; font-size: 13px; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: auto;}
-.copy-btn:not(:disabled):hover { transform: scale(1.02); }
+.copy-btn { background: var(--accent); color: var(--accent-text); border: none; padding: 14px; border-radius: 16px; font-weight: 800; font-family: 'Inter', monospace; cursor: pointer; text-transform: uppercase; font-size: 13px; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: auto; transform: translateZ(30px); }
+.copy-btn:not(:disabled):hover { transform: translateZ(40px) scale(1.05); }
 .copy-btn:disabled { opacity: 0.5; cursor: not-allowed; background: var(--input-bg); color: var(--text-secondary); border: 1px solid var(--input-border); }
 
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(15px); z-index: 10000; display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: opacity 0.4s; }
@@ -337,6 +405,39 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
 </style>
 </head>
 <body>
+
+  <!-- INTRO TRAILER OVERLAY (Бесконечная прямая неоновая сосиска) -->
+  <div id="introOverlay">
+    <div class="dragon-container">
+       <h2>GLOBAL SCRIPT'S</h2>
+       <div class="dragon-track">
+          <div class="white-dragon"></div>
+       </div>
+    </div>
+  </div>
+
+  <!-- LANDING PREVIEW (Презентация) -->
+  <div id="landingWrapper">
+    <div class="landing-hero">
+      <h1>Dive in, ride with Global Scripts</h1>
+      <p>Experience the next generation of script execution. Packed with power, built for stability, and designed for you. Join the elite community today.</p>
+      <button class="login-to-start-btn" onclick="enterAppFromLanding()">LOGIN TO START</button>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-box">
+        <h3><i data-lucide="zap" style="color:var(--success);"></i> Lightning Fast</h3>
+        <p>Blazing fast script execution with virtually zero delay and optimized memory usage.</p>
+      </div>
+      <div class="feature-box">
+        <h3><i data-lucide="shield-check" style="color:#0abfff;"></i> Crash Resistant</h3>
+        <p>Tested interface and advanced stability protocols built by veteran developers.</p>
+      </div>
+      <div class="feature-box">
+        <h3><i data-lucide="cloud" style="color:#ff9f0a;"></i> Cloud Hub</h3>
+        <p>Instant access to a massive verified database of scripts for all popular games.</p>
+      </div>
+    </div>
+  </div>
 
   <div class="ambient-bg"></div>
   <canvas id="bgCanvas"></canvas>
@@ -518,12 +619,9 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
           </div>
         </div>
 
-        <!-- ВКЛАДКА СКРИПТОВ (ПОЛЬЗОВАТЕЛЬСКАЯ) -->
         <div class="tab-content" id="tab-scripts">
           <h2 data-i18n="s_lib"><i data-lucide="file-code" style="width:28px; height:28px;"></i> Scripts Library</h2>
-          <div class="scripts-grid" id="userScriptsContainer">
-             <!-- Скрипты загружаются динамически -->
-          </div>
+          <div class="scripts-grid" id="userScriptsContainer"></div>
         </div>
 
         <div class="tab-content" id="tab-plans">
@@ -534,9 +632,24 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
           </div>
           <div id="planBuySection">
             <div class="plan-grid">
-              <div class="plan-card"><h4 data-i18n="p_start">Starter Plan</h4><div class="price">150 RUB / 7 Days</div><p data-i18n="p_start_d">Little access.</p><button class="action-btn" onclick="processPayment('Starter Plan')" data-i18n="p_purch">Purchase</button></div>
-              <div class="plan-card"><h4 data-i18n="p_pro">Professional Plan</h4><div class="price">350 RUB / 30 Days</div><p data-i18n="p_pro_d">More access.</p><button class="action-btn" onclick="processPayment('Professional Plan')" data-i18n="p_purch">Purchase</button></div>
-              <div class="plan-card"><h4 data-i18n="p_ext">Extreme Plan</h4><div class="price">700 RUB / 90 Days</div><p data-i18n="p_ext_d">All access.</p><button class="action-btn" onclick="processPayment('Extreme Plan')" data-i18n="p_purch">Purchase</button></div>
+              <div class="plan-card">
+                 <div class="plan-card-content">
+                    <h4 data-i18n="p_start">Starter Plan</h4><div class="price">150 RUB / 7 Days</div><p data-i18n="p_start_d">Little access.</p>
+                    <button class="action-btn" onclick="processPayment('Starter Plan')" data-i18n="p_purch">Purchase</button>
+                 </div>
+              </div>
+              <div class="plan-card">
+                 <div class="plan-card-content">
+                    <h4 data-i18n="p_pro">Professional Plan</h4><div class="price">350 RUB / 30 Days</div><p data-i18n="p_pro_d">More access.</p>
+                    <button class="action-btn" onclick="processPayment('Professional Plan')" data-i18n="p_purch">Purchase</button>
+                 </div>
+              </div>
+              <div class="plan-card">
+                 <div class="plan-card-content">
+                    <h4 data-i18n="p_ext">Extreme Plan</h4><div class="price">700 RUB / 90 Days</div><p data-i18n="p_ext_d">All access.</p>
+                    <button class="action-btn" onclick="processPayment('Extreme Plan')" data-i18n="p_purch">Purchase</button>
+                 </div>
+              </div>
             </div>
           </div>
           <div id="planMySection" style="display: none;">
@@ -577,20 +690,16 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
           </div>
         </div>
         
-        <!-- ВКЛАДКА РАЗРАБОТЧИКА (ADMIN PANEL) -->
         <div class="tab-content" id="tab-developers">
           <h2 data-i18n="d_tit"><i data-lucide="server" style="width:28px; height:28px;"></i> Developers</h2>
-          
           <div id="devAdminView" style="display: flex; flex-direction: column; gap: 20px;">
-             
-             <!-- УПРАВЛЕНИЕ СКРИПТАМИ (НОВОЕ) -->
              <div class="dashboard-card">
                  <h4 style="margin: 0 0 10px 0; color: var(--text-primary); display:flex; align-items:center; gap:8px;"><i data-lucide="file-code" style="width:18px;height:18px;"></i> Script Management</h4>
                  <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
                      <input type="hidden" id="devScriptId">
                      <div style="display:flex; gap:10px;">
-                         <input type="text" id="devScriptTitle" class="dev-select" placeholder="Script Title (e.g. Oxygen Hub)" style="flex:1;">
-                         <input type="text" id="devScriptGame" class="dev-select" placeholder="Game Name (e.g. Muscle Legends)" style="flex:1;">
+                         <input type="text" id="devScriptTitle" class="dev-select" placeholder="Script Title" style="flex:1;">
+                         <input type="text" id="devScriptGame" class="dev-select" placeholder="Game Name" style="flex:1;">
                      </div>
                      <input type="text" id="devScriptBanner" class="dev-select" placeholder="Banner Image URL">
                      <div style="display:flex; gap:10px; align-items:center;">
@@ -600,8 +709,8 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
                      <input type="text" id="devScriptCode" class="dev-select" placeholder="Lua Code (loadstring...)">
                      <textarea id="devScriptDesc" class="dev-select" placeholder="Description..." rows="2"></textarea>
                      <div style="display:flex; gap:10px;">
-                         <button class="action-btn" style="flex:1;" onclick="saveAdminScript()"><i data-lucide="plus" style="width:16px;height:16px;"></i> Add / Update Script</button>
-                         <button class="action-btn danger-btn" onclick="clearScriptForm()"><i data-lucide="x" style="width:16px;height:16px;"></i> Clear Form</button>
+                         <button class="action-btn" style="flex:1;" onclick="saveAdminScript()"><i data-lucide="plus" style="width:16px;height:16px;"></i> Add / Update</button>
+                         <button class="action-btn danger-btn" onclick="clearScriptForm()"><i data-lucide="x" style="width:16px;height:16px;"></i> Clear</button>
                      </div>
                  </div>
                  <div class="dev-table-wrapper" style="max-height:200px; overflow-y:auto;">
@@ -612,15 +721,12 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
                  </div>
              </div>
 
-             <!-- TICKETS SYSTEM ADMIN -->
              <div class="dashboard-card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <h4 style="margin:0; color: var(--text-primary); display:flex; align-items:center; gap:8px;"><i data-lucide="inbox" style="width:18px;height:18px;"></i> Support Tickets</h4>
                     <button class="dev-btn-sm" id="btnShowAllTickets" style="display:none;" onclick="toggleAllTickets()" data-i18n="t_show_all">Show All</button>
                 </div>
-                <div id="adminTicketsContainer" style="display: flex; flex-direction: column; max-height: 400px; overflow-y: auto;">
-                    <!-- Tickets injected here -->
-                </div>
+                <div id="adminTicketsContainer" style="display: flex; flex-direction: column; max-height: 400px; overflow-y: auto;"></div>
                 <div id="adminChatView" style="display:none; margin-top: 15px; border-top: 1px solid var(--card-border); padding-top: 15px;">
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                         <span id="adminChatTitle" style="color:var(--text-primary); font-weight:bold;">Chat with User</span>
@@ -677,17 +783,104 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
   </div>
 
 <script>
-  // Безопасная загрузка иконок (защита от краша, если интернет или CDN заблокированы)
   function updateIcons() {
       if (typeof lucide !== 'undefined') { lucide.createIcons(); }
   }
   
-  // Инициализация при первой загрузке
   document.addEventListener("DOMContentLoaded", function() {
       setTimeout(updateIcons, 100);
   });
 
-  // Глобальное хранилище данных для предотвращения ошибок с кавычками
+  function initTiltEffect() {
+      const cards = document.querySelectorAll('.feature-box:not(.tilt-applied), .script-card:not(.tilt-applied), .plan-card:not(.tilt-applied), .dashboard-card:not(.tilt-applied)');
+      cards.forEach(card => {
+          card.classList.add('tilt-applied');
+          card.addEventListener('mousemove', e => {
+              const rect = card.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              const y = e.clientY - rect.top;
+              const centerX = rect.width / 2;
+              const centerY = rect.height / 2;
+              
+              const isDashboard = card.closest('#dashboardLayout') !== null;
+              const maxTilt = isDashboard ? 1.5 : 3; 
+
+              const rotateX = ((y - centerY) / centerY) * -maxTilt;
+              const rotateY = ((x - centerX) / centerX) * maxTilt;
+              
+              card.style.transform = `perspective(1200px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.01, 1.01, 1.01)`;
+              card.style.transition = 'transform 0.2s ease-out';
+              card.style.zIndex = '10';
+          });
+          card.addEventListener('mouseleave', () => {
+              card.style.transform = `perspective(1200px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`;
+              card.style.transition = 'transform 0.6s ease';
+              card.style.zIndex = '1';
+          });
+      });
+  }
+
+  document.addEventListener('mousedown', function(e) {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      const rect = btn.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      for (let i = 0; i < 12; i++) {
+          const particle = document.createElement('span');
+          particle.className = 'btn-particle';
+          const angle = Math.random() * Math.PI * 2;
+          const velocity = 20 + Math.random() * 40; 
+          const tx = Math.cos(angle) * velocity;
+          const ty = Math.sin(angle) * velocity;
+
+          particle.style.left = x + 'px';
+          particle.style.top = y + 'px';
+          particle.style.setProperty('--tx', tx + 'px');
+          particle.style.setProperty('--ty', ty + 'px');
+
+          btn.appendChild(particle);
+          setTimeout(() => particle.remove(), 600);
+      }
+  });
+
+  let globalWarpSpeedY = 0;
+
+  window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+          const intro = document.getElementById('introOverlay');
+          if(intro) {
+              intro.style.opacity = '0';
+              setTimeout(() => {
+                  intro.style.display = 'none';
+                  document.getElementById('landingWrapper').style.display = 'flex';
+                  updateIcons();
+                  initTiltEffect();
+              }, 800);
+          }
+      }, 2000); 
+  });
+
+  function enterAppFromLanding() {
+      const landing = document.getElementById('landingWrapper');
+      landing.style.opacity = '0';
+      
+      setTimeout(() => {
+          landing.style.display = 'none';
+          
+          globalWarpSpeedY = 25; 
+
+          setTimeout(() => {
+              const appContent = document.getElementById('appMainWrapper');
+              appContent.style.display = 'flex';
+              updateIcons();
+              initTiltEffect();
+          }, 600);
+          
+      }, 500);
+  }
+
   window.userScriptsData = {};
   window.adminScriptsData = {};
 
@@ -776,6 +969,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
     document.getElementById('planBuySection').style.display = 'none'; document.getElementById('planMySection').style.display = 'none';
     if(tab === 'buy') { document.getElementById('btnBuyPlan').classList.add('active'); document.getElementById('planBuySection').style.display = 'block'; }
     else { document.getElementById('btnMyPlan').classList.add('active'); document.getElementById('planMySection').style.display = 'block'; }
+    initTiltEffect();
   }
 
   let activeTicketId = null;
@@ -785,9 +979,6 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
      if (devApproved !== 'Yes') return;
      document.getElementById('devForceKeyBtn').style.display = 'block';
      document.getElementById('navDevBtn').style.display = 'flex';
-     
-     let devUserView = document.getElementById('devUserView');
-     if(devUserView) devUserView.style.display = 'none';
 
      document.getElementById('devAdminView').style.display = 'flex';
      refreshAdminData(); setInterval(refreshConsoleLogs, 3000);
@@ -812,7 +1003,6 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
      loadAdminScripts(); 
   }
 
-  // --- СИСТЕМА УПРАВЛЕНИЯ СКРИПТАМИ (БЕЗОПАСНАЯ) ---
   function loadUserScripts() {
       fetch('/api/get_scripts').then(res=>res.json()).then(data=>{
           const container = document.getElementById('userScriptsContainer');
@@ -823,13 +1013,12 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
           }
           
           let now = new Date().getTime();
-          window.userScriptsData = {}; // Очищаем старые данные
+          window.userScriptsData = {}; 
           
           data.scripts.forEach(s => {
               let releaseTime = new Date(s.release_date).getTime();
               let isLocked = releaseTime > now;
               
-              // СОХРАНЯЕМ КОД В ГЛОБАЛЬНЫЙ МАССИВ (БЕЗ ВСТАВКИ В HTML)
               window.userScriptsData[s.id] = s.script_code;
               
               let btnHtml = '';
@@ -837,7 +1026,6 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
                   let dateStr = new Date(s.release_date).toLocaleString();
                   btnHtml = `<button class="copy-btn" disabled><i data-lucide="lock" style="width:16px;height:16px;"></i> Unlocks: ${dateStr}</button>`;
               } else {
-                  // ПЕРЕДАЕМ ТОЛЬКО ID (Безопасно!)
                   btnHtml = `<button class="copy-btn" onclick="copyDynamicScript(this, ${s.id})" data-i18n="s_copy"><i data-lucide="copy" style="width:16px;height:16px;"></i> COPY LUA SCRIPT</button>`;
               }
               
@@ -856,6 +1044,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
               </div>`;
           });
           updateIcons();
+          initTiltEffect();
       });
   }
 
@@ -863,12 +1052,10 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
       fetch('/api/get_scripts?admin=true').then(res=>res.json()).then(data=>{
           const tbody = document.getElementById('devScriptsTableBody');
           tbody.innerHTML = '';
-          window.adminScriptsData = {}; // Очищаем старые данные
+          window.adminScriptsData = {}; 
           
           data.scripts.forEach(s => {
-              // СОХРАНЯЕМ ОБЪЕКТ В ГЛОБАЛЬНЫЙ МАССИВ (БЕЗ ВСТАВКИ В HTML)
               window.adminScriptsData[s.id] = s;
-              
               let f_icon = s.is_frozen === 'Yes' ? 'snowflake' : 'pause';
               let f_color = s.is_frozen === 'Yes' ? 'dev-btn-danger' : '';
 
@@ -879,7 +1066,6 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
                   <td>${s.release_date}</td>
                   <td>
                       <div style="display:flex; gap:8px;">
-                          <!-- ПЕРЕДАЕМ ТОЛЬКО ID (Безопасно!) -->
                           <button class="dev-btn-sm" onclick="editAdminScript(${s.id})"><i data-lucide="edit-3" style="width:14px;height:14px;"></i></button>
                           <button class="dev-btn-sm ${f_color}" onclick="toggleFreezeScript(${s.id})"><i data-lucide="${f_icon}" style="width:14px;height:14px;"></i></button>
                           <button class="dev-btn-sm dev-btn-danger" onclick="deleteScript(${s.id})"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>
@@ -958,7 +1144,6 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
           .then(res=>res.json()).then(data => { if(data.success){ loadAdminScripts(); loadUserScripts(); } });
       });
   }
-  // ------------------------------------
 
   function submitUserTicket() {
       const reason = document.getElementById('uTicketReason').value.trim();
@@ -1122,7 +1307,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
   }
 
   const canvas = document.getElementById('bgCanvas'); const ctx = canvas.getContext('2d');
-  let width, height, particles = [], mouse = { x: -1000, y: -1000 }, currentDotColor = 'rgba(255, 255, 255, 0.3)', isErrorState = false, globalSpeedBoost = 0, isSystemLoading = false; 
+  let width, height, particles = [], mouse = { x: -1000, y: -1000 }, currentDotColor = 'rgba(255, 255, 255, 0.3)', isErrorState = false, isSystemLoading = false; 
   function updateCanvasColor() { currentDotColor = getComputedStyle(document.body).getPropertyValue('--dot-color').trim(); }
   function resize() { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; initParticles(); }
   window.addEventListener('resize', resize);
@@ -1130,8 +1315,14 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
     constructor() { this.x = Math.random() * width; this.y = Math.random() * height; this.size = Math.random() * 2 + 1; this.density = (Math.random() * 20) + 5; this.angle = Math.random() * 360; this.speed = Math.random() * 0.3 + 0.1; this.vx = 0; this.vy = 0; this.friction = 0.92; }
     update() {
       this.angle += 0.01;
-      if (isSystemLoading) { this.vy -= 1.5; this.vx += (Math.random() - 0.5) * 0.2; } else { this.vy -= this.speed * 0.1; this.vx += Math.sin(this.angle) * 0.05; }
-      this.y -= globalSpeedBoost * (this.speed * 1.5);
+      
+      if (globalWarpSpeedY > 0) {
+          this.y -= globalWarpSpeedY * (this.speed * 2);
+      } else {
+          if (isSystemLoading) { this.vy -= 1.5; this.vx += (Math.random() - 0.5) * 0.2; } 
+          else { this.vy -= this.speed * 0.1; this.vx += Math.sin(this.angle) * 0.05; }
+      }
+
       let dx = mouse.x - this.x, dy = mouse.y - this.y, distance = Math.sqrt(dx * dx + dy * dy), maxDistance = 180;
       if (distance < maxDistance) { let force = (maxDistance - distance) / maxDistance; this.vx -= (dx / distance) * force * 1.5; this.vy -= (dy / distance) * force * 1.5; }
       this.vx *= this.friction; this.vy *= this.friction; this.x += this.vx; this.y += this.vy;
@@ -1145,7 +1336,12 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
   function initParticles() { particles = []; let numberOfParticles = (width * height) / 8000; for (let i = 0; i < numberOfParticles; i++) particles.push(new Particle()); }
   window.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
   window.addEventListener('mouseout', () => { mouse.x = -1000; mouse.y = -1000; });
-  function animate() { ctx.clearRect(0, 0, width, height); globalSpeedBoost *= 0.92; for (let i = 0; i < particles.length; i++) { particles[i].update(); particles[i].draw(); } requestAnimationFrame(animate); }
+  function animate() { 
+      ctx.clearRect(0, 0, width, height); 
+      if (globalWarpSpeedY > 0) { globalWarpSpeedY *= 0.94; if (globalWarpSpeedY < 0.1) globalWarpSpeedY = 0; }
+      for (let i = 0; i < particles.length; i++) { particles[i].update(); particles[i].draw(); } 
+      requestAnimationFrame(animate); 
+  }
   updateCanvasColor(); resize(); animate();
 
   const themeBtn = document.getElementById('themeBtn');
@@ -1160,10 +1356,11 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
   const sidebarBtns = document.querySelectorAll('.sidebar-btn');
   const tabContents = document.querySelectorAll('.tab-content');
   function switchTab(targetId) {
-    globalSpeedBoost = 30; sidebarBtns.forEach(b => b.classList.remove('active')); tabContents.forEach(t => t.classList.remove('active'));
+    sidebarBtns.forEach(b => b.classList.remove('active')); tabContents.forEach(t => t.classList.remove('active'));
     sidebarBtns.forEach(b => { if(b.getAttribute('data-target') === targetId) b.classList.add('active'); }); document.getElementById(targetId).classList.add('active');
     if(targetId === 'tab-faq' && !document.getElementById('userTicketChatCard').style.display.includes('none')) { checkUserTicketState(); }
     if(targetId === 'tab-scripts') { loadUserScripts(); }
+    initTiltEffect(); 
   }
   sidebarBtns.forEach(btn => btn.addEventListener('click', () => switchTab(btn.getAttribute('data-target'))));
   document.getElementById('userDisplay').addEventListener('click', () => switchTab('tab-main'));
@@ -1176,16 +1373,17 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
     const savedLang = localStorage.getItem('lang') || 'en'; setLang(savedLang);
     const appMainWrapper = document.getElementById('appMainWrapper'); const authForm = document.getElementById('authForm'); const secretForm = document.getElementById('secretForm'); const regForm = document.getElementById('regForm'); const twoFaForm = document.getElementById('twoFaForm'); const createAccountWrapper = document.getElementById('createAccountWrapper');
     
-    if ({{ show_freeze }}) { appMainWrapper.style.display = 'none'; document.getElementById('freezeScreen').style.display = 'flex'; return; }
+    if ({{ show_freeze }}) { document.getElementById('introOverlay').style.display = 'none'; appMainWrapper.style.display = 'none'; document.getElementById('freezeScreen').style.display = 'flex'; return; }
     if ({{ show_maintenance }}) {
+        document.getElementById('introOverlay').style.display = 'none';
         appMainWrapper.style.display = 'none'; document.getElementById('maintenanceScreen').style.display = 'flex';
-        let lockClicks = 0; document.getElementById('maintenanceLockIcon').addEventListener('click', () => { lockClicks++; if (lockClicks >= 3) { document.getElementById('maintenanceScreen').style.display = 'none'; appMainWrapper.style.display = 'flex'; authForm.style.display = 'flex'; } });
+        let lockClicks = 0; document.getElementById('maintenanceLockIcon').addEventListener('click', () => { lockClicks++; if (lockClicks >= 3) { document.getElementById('maintenanceScreen').style.display = 'none'; document.getElementById('landingWrapper').style.display = 'flex'; authForm.style.display = 'flex'; } });
         return;
     }
 
-    document.getElementById('createAccountLink').addEventListener('click', () => { authForm.style.display = 'none'; regForm.style.display = 'flex'; loadCaptcha(); globalSpeedBoost = 20; });
-    document.getElementById('backToLoginLink').addEventListener('click', () => { regForm.style.display = 'none'; authForm.style.display = 'flex'; globalSpeedBoost = 20; createAccountWrapper.classList.remove('show'); hideMessage('message'); });
-    document.getElementById('cancelSecretLink').addEventListener('click', () => { secretForm.style.display = 'none'; authForm.style.display = 'flex'; globalSpeedBoost = 20; });
+    document.getElementById('createAccountLink').addEventListener('click', () => { authForm.style.display = 'none'; regForm.style.display = 'flex'; loadCaptcha(); });
+    document.getElementById('backToLoginLink').addEventListener('click', () => { regForm.style.display = 'none'; authForm.style.display = 'flex'; createAccountWrapper.classList.remove('show'); hideMessage('message'); });
+    document.getElementById('cancelSecretLink').addEventListener('click', () => { secretForm.style.display = 'none'; authForm.style.display = 'flex'; });
     document.getElementById('cancel2FaLink').addEventListener('click', () => { twoFaForm.style.display = 'none'; authForm.style.display = 'flex'; });
 
     const regBtn = document.getElementById('regBtn');
@@ -1203,7 +1401,12 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
       });
     });
 
-    if ({{ 'true' if current_user else 'false' }}) { loadDashboard(); }
+    if ({{ 'true' if current_user else 'false' }}) { 
+        document.getElementById('introOverlay').style.display = 'none';
+        document.getElementById('landingWrapper').style.display = 'none';
+        appMainWrapper.style.display = 'flex';
+        loadDashboard(); 
+    }
 
     function loadDashboard() {
         document.getElementById('mainHeader').style.display = 'none'; document.getElementById('dashboardLayout').style.display = 'flex';
@@ -1216,11 +1419,15 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
                     document.getElementById('rewardValue').innerText = valText; document.getElementById('rewardMessage').innerText = rMsg; document.getElementById('rewardScreen').style.display = 'flex';
                 }
                 if(data.active_key) { document.getElementById('generatedKeyDisplay').innerText = data.active_key; document.getElementById('generatedKeyDisplay').style.display = 'block'; }
+                
+                const greetings = ["Welcome back", "Glad to see you", "Hello", "Ready for action", "Good to have you"];
+                const randGreet = greetings[Math.floor(Math.random() * greetings.length)];
+                document.getElementById('planGreeting').innerText = `${randGreet}, ${data.login}!`;
+
                 document.getElementById('userDisplay').innerHTML = `<i data-lucide="user" style="width:14px; height:14px;"></i> <span id="userLoginText">${data.login}</span>`;
                 document.getElementById('profileLogin').innerText = data.login; document.getElementById('profilePlan').innerText = data.plan; document.getElementById('profileRegDate').innerText = data.reg_date; document.getElementById('profileDevApproved').innerText = data.dev_approved; document.getElementById('planCurrentStatus').innerText = "Your current plan: " + data.plan + " - " + data.plan_days + " Days";
                 
-                loadUserScripts(); // Загрузка скриптов юзера
-
+                loadUserScripts(); 
                 loadAdminPanel(data.dev_approved); setInterval(checkUserTicketState, 5000); checkUserTicketState();
                 updateIcons();
             }
@@ -1237,7 +1444,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
       }).then(res => res.json()).then(data => {
         if (data.success) {
           if(data.is_frozen) { window.location.reload(); } 
-          else if(data.require_secret) { hideMessage('message'); authForm.style.display = 'none'; secretForm.style.display = 'flex'; globalSpeedBoost = 15; } 
+          else if(data.require_secret) { hideMessage('message'); authForm.style.display = 'none'; secretForm.style.display = 'flex'; } 
           else if(data.require_2fa) { authForm.style.display = 'none'; twoFaForm.style.display = 'flex'; } 
           else { hideMessage('message'); authForm.style.display = 'none'; document.getElementById('mainHeader').style.display = 'none'; showLoadingScreen(); setTimeout(() => { document.getElementById('clockWrapper').style.display = 'flex'; document.getElementById('userWrapper').style.display = 'flex'; hideLoadingScreen(); loadDashboard(); }, 2500); }
         } else { showMessage('message', 'Invalid credentials.', false); triggerErrorAnimation(authForm); createAccountWrapper.classList.add('show'); }
@@ -1485,17 +1692,14 @@ def mobile_verify():
     conn.close()
     return f"SUCCESS|{key_row['user_login']}|{key_row['plan']}"
 
-# --- ТИКЕТЫ (SUPPORT) ---
 @app.route('/api/submit_ticket', methods=['POST'])
 def submit_ticket():
     current_user = session.get('user')
     if not current_user: return jsonify({'success': False})
     data = request.get_json()
     reason = data.get('reason'); priority = data.get('priority')
-    
     tz = pytz.timezone('Europe/Moscow')
     now = datetime.now(tz).strftime('%d.%m.%Y %H:%M')
-    
     conn = get_db_connection()
     conn.execute("INSERT INTO tickets (user_login, reason, priority, created_at) VALUES (?, ?, ?, ?)", (current_user, reason, priority, now))
     conn.commit(); conn.close()
@@ -1506,10 +1710,8 @@ def submit_ticket():
 def get_user_ticket():
     current_user = session.get('user')
     if not current_user: return jsonify({'ticket': None})
-    
     conn = get_db_connection()
     ticket = conn.execute("SELECT * FROM tickets WHERE user_login = ? ORDER BY id DESC LIMIT 1", (current_user,)).fetchone()
-    
     if ticket:
         messages = conn.execute("SELECT * FROM ticket_messages WHERE ticket_id = ?", (ticket['id'],)).fetchall()
         conn.close()
@@ -1523,7 +1725,6 @@ def admin_get_tickets():
     conn = get_db_connection()
     check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
     if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
-    
     tickets = conn.execute("SELECT * FROM tickets ORDER BY id DESC").fetchall()
     conn.close()
     return jsonify({'success': True, 'tickets': [dict(t) for t in tickets]})
@@ -1534,13 +1735,10 @@ def ticket_action():
     conn = get_db_connection()
     check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
     if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
-    
     data = request.get_json()
     t_id = data.get('id'); action = data.get('action')
-    
     if action == 'accept': conn.execute("UPDATE tickets SET status = 'active' WHERE id = ?", (t_id,))
     elif action == 'reject' or action == 'close': conn.execute("UPDATE tickets SET status = 'closed' WHERE id = ?", (t_id,))
-    
     conn.commit(); conn.close()
     return jsonify({'success': True})
 
@@ -1548,10 +1746,8 @@ def ticket_action():
 def send_message():
     data = request.get_json()
     t_id = data.get('id'); msg = data.get('message'); role = data.get('role')
-    
     tz = pytz.timezone('Europe/Moscow')
     now = datetime.now(tz).strftime('%H:%M')
-    
     conn = get_db_connection()
     conn.execute("INSERT INTO ticket_messages (ticket_id, sender, message, sent_at) VALUES (?, ?, ?, ?)", (t_id, role, msg, now))
     conn.commit(); conn.close()
@@ -1565,12 +1761,10 @@ def get_messages():
     conn.close()
     return jsonify({'messages': [dict(m) for m in messages]})
 
-# --- АПИ СКРИПТОВ ---
 @app.route('/api/get_scripts', methods=['GET'])
 def get_scripts():
     is_admin_request = request.args.get('admin') == 'true'
     current_user = session.get('user')
-    
     conn = get_db_connection()
     if is_admin_request:
         check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
@@ -1581,7 +1775,6 @@ def get_scripts():
     else:
         scripts = conn.execute("SELECT * FROM scripts WHERE is_frozen = 'No' ORDER BY id DESC").fetchall()
     conn.close()
-    
     return jsonify({'success': True, 'scripts': [dict(s) for s in scripts]})
 
 @app.route('/admin/save_script', methods=['POST'])
@@ -1591,16 +1784,10 @@ def save_script():
     check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
     if not check or check['dev_approved'] != 'Yes': 
         conn.close(); return jsonify({'success': False}), 403
-        
     data = request.get_json()
-    s_id = data.get('id')
-    title = data.get('title')
-    game = data.get('game')
-    banner = data.get('banner_url')
-    r_date = data.get('release_date')
-    code = data.get('script_code')
-    desc = data.get('description')
-    
+    s_id = data.get('id'); title = data.get('title'); game = data.get('game')
+    banner = data.get('banner_url'); r_date = data.get('release_date')
+    code = data.get('script_code'); desc = data.get('description')
     if s_id:
         conn.execute('''UPDATE scripts SET title=?, game=?, banner_url=?, release_date=?, script_code=?, description=? WHERE id=?''',
                      (title, game, banner, r_date, code, desc, s_id))
@@ -1616,7 +1803,6 @@ def freeze_script():
     conn = get_db_connection()
     check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
     if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
-        
     s_id = request.get_json().get('id')
     target = conn.execute("SELECT is_frozen FROM scripts WHERE id = ?", (s_id,)).fetchone()
     new_status = 'No' if target['is_frozen'] == 'Yes' else 'Yes'
@@ -1630,21 +1816,17 @@ def delete_script():
     conn = get_db_connection()
     check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
     if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
-        
     s_id = request.get_json().get('id')
     conn.execute("DELETE FROM scripts WHERE id = ?", (s_id,))
     conn.commit(); conn.close()
     return jsonify({'success': True})
 
-
-# --- АДМИНКА (ПРОЧЕЕ) ---
 @app.route('/admin/get_users')
 def admin_get_users():
     current_user = session.get('user')
     conn = get_db_connection()
     check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
     if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
-        
     db_users = conn.execute("SELECT login, plan, plan_days, is_frozen, dev_approved FROM users").fetchall()
     maintenance = conn.execute("SELECT value FROM settings WHERE key = 'maintenance'").fetchone()
     conn.close()
@@ -1665,21 +1847,16 @@ def admin_change_plan():
     conn = get_db_connection()
     check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
     if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
-        
     data = request.get_json()
     target_user = data.get('login'); new_plan = data.get('plan'); dev_msg = data.get('message', '')
-    
     target_data = conn.execute("SELECT plan, dev_approved FROM users WHERE login = ?", (target_user,)).fetchone()
     if target_data and (target_data['dev_approved'] == 'Yes' or 'Developer' in target_data['plan']):
         conn.close(); return jsonify({'success': False, 'message': 'Cannot modify a Developer account.'})
-
     days = 7 if 'Starter' in new_plan else (30 if 'Professional' in new_plan else 90)
     reward_data = json.dumps({"type": "plan", "value": new_plan, "msg": dev_msg})
-    
     conn.execute("UPDATE users SET plan = ?, plan_days = ?, pending_reward = ? WHERE login = ?", (new_plan, days, reward_data, target_user))
     conn.execute("DELETE FROM keys WHERE user_login = ?", (target_user,))
     conn.commit(); conn.close()
-    c_log('WARNING', f"Developer '{current_user}' updated '{target_user}' plan to '{new_plan}'.")
     return jsonify({'success': True})
 
 @app.route('/admin/add_days', methods=['POST'])
@@ -1688,14 +1865,8 @@ def admin_add_days():
     conn = get_db_connection()
     check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
     if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
-        
     data = request.get_json()
     target_user = data.get('login'); dev_msg = data.get('message', '')
-    
-    target_data = conn.execute("SELECT plan, dev_approved FROM users WHERE login = ?", (target_user,)).fetchone()
-    if target_data and (target_data['dev_approved'] == 'Yes' or 'Developer' in target_data['plan']):
-        conn.close(); return jsonify({'success': False, 'message': 'Cannot modify a Developer account.'})
-
     reward_data = json.dumps({"type": "days", "value": "+7 Days", "msg": dev_msg})
     conn.execute("UPDATE users SET plan_days = plan_days + 7, pending_reward = ? WHERE login = ?", (reward_data, target_user))
     conn.commit(); conn.close()
@@ -1707,13 +1878,8 @@ def admin_toggle_freeze():
     conn = get_db_connection()
     check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
     if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
-        
     data = request.get_json(); target_user = data.get('login')
-    
-    target_data = conn.execute("SELECT is_frozen, dev_approved, plan FROM users WHERE login = ?", (target_user,)).fetchone()
-    if target_data and (target_data['dev_approved'] == 'Yes' or 'Developer' in target_data['plan']):
-        conn.close(); return jsonify({'success': False, 'message': 'Cannot modify a Developer account.'})
-        
+    target_data = conn.execute("SELECT is_frozen FROM users WHERE login = ?", (target_user,)).fetchone()
     new_status = 'No' if target_data['is_frozen'] == 'Yes' else 'Yes'
     conn.execute("UPDATE users SET is_frozen = ? WHERE login = ?", (new_status, target_user))
     conn.commit(); conn.close()
@@ -1725,7 +1891,6 @@ def admin_toggle_maintenance():
     conn = get_db_connection()
     check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
     if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
-        
     m_data = conn.execute("SELECT value FROM settings WHERE key = 'maintenance'").fetchone()
     new_val = 'No' if m_data and m_data['value'] == 'Yes' else 'Yes'
     conn.execute("UPDATE settings SET value = ? WHERE key = 'maintenance'", (new_val,))
@@ -1738,13 +1903,7 @@ def admin_delete_user():
     conn = get_db_connection()
     check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
     if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
-        
     data = request.get_json(); target_user = data.get('login')
-    
-    target_data = conn.execute("SELECT dev_approved, plan FROM users WHERE login = ?", (target_user,)).fetchone()
-    if target_data and (target_data['dev_approved'] == 'Yes' or 'Developer' in target_data['plan']):
-        conn.close(); return jsonify({'success': False, 'message': 'Cannot modify a Developer account.'})
-        
     conn.execute("DELETE FROM users WHERE login = ?", (target_user,))
     conn.commit(); conn.close()
     return jsonify({'success': True})
@@ -1755,83 +1914,56 @@ def admin_update_discord():
     conn = get_db_connection()
     check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
     if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
-        
     new_link = request.get_json().get('link', '').strip()
     conn.execute("UPDATE settings SET value = ? WHERE key = 'discord_link'", (new_link,))
     conn.commit(); conn.close()
     return jsonify({'success': True})
 
-# --- СИСТЕМА ОПЛАТЫ И ЧЕКОВ ---
 @app.route('/create_payment', methods=['POST'])
 def create_payment():
     current_user = session.get('user')
     if not current_user: return jsonify({'success': False, 'message': 'Unauthorized'})
-        
     data = request.get_json(); plan_name = data.get('plan')
     amount = 150 if 'Starter' in plan_name else (350 if 'Professional' in plan_name else 700)
-    
     pay_id = f"{int(time.time())}{random.randint(10,99)}"
     desc = f"Payment for {plan_name}"
     currency = "RUB"
-    
     conn = get_db_connection()
     conn.execute("INSERT INTO pending_payments (pay_id, user_login, plan, amount) VALUES (?, ?, ?, ?)", (pay_id, current_user, plan_name, amount))
-    conn.commit()
-    conn.close()
-
+    conn.commit(); conn.close()
     sign_string = f"{ANYPAY_MERCHANT_ID}:{amount}:{pay_id}:{currency}:{desc}:{ANYPAY_SECRET_KEY_1}"
     sign = hashlib.md5(sign_string.encode('utf-8')).hexdigest()
-    
     payment_url = f"https://anypay.io/merchant?merchant_id={ANYPAY_MERCHANT_ID}&amount={amount}&pay_id={pay_id}&currency={currency}&desc={desc}&sign={sign}"
-    
-    c_log('INFO', f"User '{current_user}' initiated ANYPAY payment for {plan_name} ({amount} RUB)")
     return jsonify({'success': True, 'payment_url': payment_url})
 
 @app.route('/api/anypay_ipn', methods=['POST', 'GET'])
 def payment_webhook():
     data = request.form if request.form else request.get_json()
     if not data: return "No Data", 400
-
     merchant_id = data.get('merchant_id', '')
     amount = data.get('amount', '')
     pay_id = data.get('pay_id', '')
     status = data.get('status', '')
-    sign = data.get('sign', '')
-    currency = data.get('currency', 'RUB')
-
-    check_string = f"{currency}:{amount}:{pay_id}:{merchant_id}:{status}:{ANYPAY_SECRET_KEY_2}"
-    expected_sign = hashlib.md5(check_string.encode('utf-8')).hexdigest()
-
     if status == 'paid' or 'SIM_' in pay_id:
         conn = get_db_connection()
         pending = conn.execute("SELECT * FROM pending_payments WHERE pay_id = ?", (pay_id,)).fetchone()
-        
         if pending:
-            user_login = pending['user_login']
-            bought_plan = pending['plan']
-            amount_db = pending['amount']
-            
+            user_login = pending['user_login']; bought_plan = pending['plan']; amount_db = pending['amount']
             days = 7 if 'Starter' in bought_plan else (30 if 'Professional' in bought_plan else 90)
-            
             tz = pytz.timezone('Europe/Moscow')
             date_str = datetime.now(tz).strftime('%d.%m.%Y %H:%M')
             reward_data = json.dumps({"type": "plan", "value": bought_plan, "msg": "Thank you for your purchase via AnyPay!"})
-            
             conn.execute("UPDATE users SET plan = ?, plan_days = ?, pending_reward = ? WHERE login = ?", (bought_plan, days, reward_data, user_login))
             conn.execute("DELETE FROM keys WHERE user_login = ?", (user_login,))
             conn.execute("INSERT INTO receipts (user_login, plan, amount, tx_id, date_str) VALUES (?, ?, ?, ?, ?)", (user_login, bought_plan, amount_db, pay_id, date_str))
             conn.execute("DELETE FROM pending_payments WHERE pay_id = ?", (pay_id,))
-            
-            c_log('SUCCESS', f"AUTOMATIC PAYMENT: User '{user_login}' paid for {bought_plan}! Receipt generated.")
         conn.commit(); conn.close()
-
     return "OK", 200
 
 @app.route('/api/get_receipts', methods=['GET'])
 def get_receipts():
     current_user = session.get('user')
     if not current_user: return jsonify({'receipts': []})
-    
     conn = get_db_connection()
     receipts = conn.execute("SELECT * FROM receipts WHERE user_login = ? ORDER BY id DESC", (current_user,)).fetchall()
     conn.close()
@@ -1864,12 +1996,6 @@ def delete_account():
 def logout(): 
     session.pop('user', None)
     return ('', 204)
-
-@app.route('/anypay-verification.txt')
-@app.route('/7641a8b9610252ee169f2815a5c2.txt')
-def anypay_txt_verify():
-    # Возвращаем чистый текст для бота AnyPay
-    return "7641a8b9610252ee169f2815a5c2", 200, {'Content-Type': 'text/plain'}
 
 if __name__ == '__main__':
     c_log('SERVICE', "Starting production server on port 5000...")
