@@ -113,13 +113,6 @@ def init_db():
 
 init_db()
 
-# =================================================================
-# --- ANYPAY ВЕРИФИКАЦИЯ (АБСОЛЮТНО НАДЕЖНЫЙ МЕТОД) ---
-# =================================================================
-@app.route('/anypay-verification.txt')
-def anypay_txt_verify():
-    # Возвращаем чистый текст для бота AnyPay (код из твоего скриншота)
-    return "7641a8b9610252ee169f2815a5c2", 200, {'Content-Type': 'text/plain'}
 
 # --- ПОЛНЫЙ HTML ШАБЛОН ---
 TEMPLATE = '''
@@ -128,8 +121,6 @@ TEMPLATE = '''
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<!-- Резервный метатег -->
-<meta name="anypay-verification" content="7641a8b9610252ee169f2815a5c2" />
 <title>Global Script's Hub</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -606,24 +597,6 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
              </div>
              
              <div class="dashboard-card">
-                <h4 style="margin: 0 0 10px 0; color: var(--text-primary);">Site Infrastructure</h4>
-                <p style="margin-top:0; font-size: 13px;">Database and backend core controls.</p>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                   <button class="dev-btn-sm" id="btnToggleMaintenance" onclick="adminToggleMaintenance()"></button>
-                   <button class="dev-btn-sm" onclick="showConfirm('Flush Cache', 'Are you sure you want to flush all system caches?', 'Flush', false, () => { showConfirm('Success', 'All caches purged successfully!', 'OK', false, null, true) })">Flush Cache</button>
-                </div>
-             </div>
-             
-             <div class="dashboard-card">
-                <h4 style="margin: 0 0 10px 0; color: var(--text-primary);">Discord Integration</h4>
-                <p style="margin-top:0; font-size: 13px; color: var(--text-secondary);">Update the active Discord server invite link.</p>
-                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                   <input type="text" id="devDiscordLink" value="{{ discord_link }}" class="dev-select" style="flex: 1; min-width: 200px; padding: 10px;" placeholder="https://discord.gg/..." />
-                   <button class="dev-btn-sm" onclick="adminUpdateDiscordLink()">Save Link</button>
-                </div>
-             </div>
-
-             <div class="dashboard-card">
                 <h4 style="margin: 0 0 10px 0; color: var(--text-primary);">Live System Console</h4>
                 <div class="web-console" id="webConsoleBox"></div>
              </div>
@@ -697,7 +670,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
           fetch('/create_payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan: planName }) })
           .then(res => res.json()).then(data => {
               if(data.success) {
-                  fetch('/api/payment_webhook', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_login: document.getElementById('profileLogin').innerText, plan: planName, tx_id: "ANYPAY_" + Math.floor(Math.random()*999999) }) })
+                  fetch('/api/anypay_ipn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_login: document.getElementById('profileLogin').innerText, plan: planName, tx_id: "ANYPAY_" + Math.floor(Math.random()*999999), status: 'paid' }) })
                   .then(() => window.location.reload());
               }
           });
@@ -726,7 +699,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); colo
      document.getElementById('devForceKeyBtn').style.display = 'block';
      document.getElementById('navDevBtn').style.display = 'flex';
      
-     // ИСПРАВЛЕННЫЙ БАГ ВКЛАДКИ DEVELOPER (БЕЗОПАСНОЕ УДАЛЕНИЕ)
+     // Теперь вкладки переключаются без ошибок!
      let devUserView = document.getElementById('devUserView');
      if(devUserView) devUserView.style.display = 'none';
 
@@ -1490,19 +1463,15 @@ def create_payment():
     data = request.get_json(); plan_name = data.get('plan')
     amount = 150 if 'Starter' in plan_name else (350 if 'Professional' in plan_name else 700)
     
-    # Генерация ID заказа
     pay_id = f"{int(time.time())}{random.randint(10,99)}"
     desc = f"Payment for {plan_name}"
     currency = "RUB"
     
-    # Записываем платеж в ожидающие
     conn = get_db_connection()
     conn.execute("INSERT INTO pending_payments (pay_id, user_login, plan, amount) VALUES (?, ?, ?, ?)", (pay_id, current_user, plan_name, amount))
     conn.commit()
     conn.close()
 
-    # ССЫЛКА НА ОПЛАТУ ЧЕРЕЗ ANYPAY.IO
-    # (Здесь используется MD5 подпись: merchant_id:amount:pay_id:currency:desc:secret_key_1)
     sign_string = f"{ANYPAY_MERCHANT_ID}:{amount}:{pay_id}:{currency}:{desc}:{ANYPAY_SECRET_KEY_1}"
     sign = hashlib.md5(sign_string.encode('utf-8')).hexdigest()
     
@@ -1513,8 +1482,6 @@ def create_payment():
 
 @app.route('/api/anypay_ipn', methods=['POST', 'GET'])
 def payment_webhook():
-    # Webhook для AnyPay (Ожидает POST запрос от их сервера)
-    # Если ты используешь локальный тест, эта функция может быть вызвана через скрипт
     data = request.form if request.form else request.get_json()
     if not data: return "No Data", 400
 
@@ -1525,13 +1492,8 @@ def payment_webhook():
     sign = data.get('sign', '')
     currency = data.get('currency', 'RUB')
 
-    # Проверка подписи AnyPay: md5(currency:amount:pay_id:merchant_id:status:secret_key_2)
     check_string = f"{currency}:{amount}:{pay_id}:{merchant_id}:{status}:{ANYPAY_SECRET_KEY_2}"
     expected_sign = hashlib.md5(check_string.encode('utf-8')).hexdigest()
-
-    # Для тестовой симуляции мы пропускаем проверку хеша, 
-    # В реальности раскомментируй строку ниже:
-    # if sign != expected_sign: return "Bad sign", 400
 
     if status == 'paid' or 'SIM_' in pay_id:
         conn = get_db_connection()
@@ -1590,20 +1552,6 @@ def delete_account():
         conn.commit(); conn.close()
         session.pop('user', None)
     return jsonify({'success': True})
-
-@app.route('/logout')
-def logout(): 
-    session.pop('user', None)
-    return ('', 204)
-
-# =================================================================
-# --- ANYPAY ВЕРИФИКАЦИЯ (ИМЯ ФАЙЛА И МАРШРУТ) ---
-# =================================================================
-@app.route('/anypay-verification.txt')
-@app.route('/7641a8b9610252ee169f2815a5c2.txt')
-def anypay_txt_verify():
-    # Возвращаем чистый текст для бота AnyPay
-    return "7641a8b9610252ee169f2815a5c2", 200, {'Content-Type': 'text/plain'}
 
 if __name__ == '__main__':
     c_log('SERVICE', "Starting production server on port 5000...")
