@@ -1570,9 +1570,6 @@ def delete_account():
     return jsonify({'success': True})
 
 @app.route('/logout')
-def logout(): session.pop('user', None); return ('', 204)
-
-@app.route('/logout')
 def logout(): 
     session.pop('user', None)
     return ('', 204)
