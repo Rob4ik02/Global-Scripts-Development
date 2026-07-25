@@ -4,6 +4,7 @@ import random
 import string
 import time
 import smtplib
+import json
 from email.mime.text import MIMEText
 from flask import Flask, render_template_string, request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -98,10 +99,18 @@ def init_db():
             plan TEXT DEFAULT 'Free Tier',
             plan_days INTEGER DEFAULT 0,
             dev_approved TEXT DEFAULT 'No',
-            is_frozen TEXT DEFAULT 'No'
+            is_frozen TEXT DEFAULT 'No',
+            pending_reward TEXT DEFAULT ''
         )
     ''')
     
+    cursor = conn.execute("PRAGMA table_info(users)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if 'is_frozen' not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN is_frozen TEXT DEFAULT 'No'")
+    if 'pending_reward' not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN pending_reward TEXT DEFAULT ''")
+
     conn.execute('''
         CREATE TABLE IF NOT EXISTS keys (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -129,9 +138,9 @@ def init_db():
         tz = pytz.timezone('Europe/Moscow')
         reg_date = datetime.now(tz).strftime('%d.%m.%Y')
         conn.execute('''
-            INSERT INTO users (login, password_hash, email, secret, source, reg_date, plan, plan_days, dev_approved, is_frozen)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', ('Rob4ikDev', generate_password_hash('baconsecret6666'), '', 'globalscript', 'creator', reg_date, 'Developer Tier', 999, 'Yes', 'No'))
+            INSERT INTO users (login, password_hash, email, secret, source, reg_date, plan, plan_days, dev_approved, is_frozen, pending_reward)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', ('Rob4ikDev', generate_password_hash('baconsecret6666'), '', 'globalscript', 'creator', reg_date, 'Developer Tier', 999, 'Yes', 'No', ''))
         c_log('SUCCESS', "Admin account 'Rob4ikDev' created successfully.")
     
     conn.commit()
@@ -274,12 +283,18 @@ body {
 .fullscreen-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; overflow: hidden; }
 #freezeScreen { background: radial-gradient(circle at center, rgba(10, 191, 255, 0.1) 0%, var(--bg-color) 80%); backdrop-filter: blur(10px) contrast(1.1); -webkit-backdrop-filter: blur(10px) contrast(1.1); }
 #maintenanceScreen { background: radial-gradient(circle at center, rgba(255, 159, 10, 0.08) 0%, var(--bg-color) 80%), repeating-linear-gradient(45deg, rgba(255, 159, 10, 0.03), rgba(255, 159, 10, 0.03) 10px, transparent 10px, transparent 20px); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+#rewardScreen { background: radial-gradient(circle at center, rgba(52, 199, 89, 0.1) 0%, var(--bg-color) 80%); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); }
+
 .bg-massive-icon { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 280px; z-index: 1; user-select: none; }
 #freezeScreen .bg-massive-icon { opacity: 0.2; color: #0abfff; filter: drop-shadow(0 0 50px #0abfff); animation: spin 10s linear infinite; }
 #maintenanceScreen .bg-massive-icon { opacity: 0.15; color: #ff9f0a; filter: drop-shadow(0 0 40px #ff9f0a); animation: slowPulse 3s ease-in-out infinite; cursor: pointer; }
+#rewardScreen .bg-massive-icon { opacity: 0.15; color: var(--success); filter: drop-shadow(0 0 50px var(--success)); animation: spin 15s linear infinite; }
+
 .overlay-content-box { position: relative; z-index: 2; max-width: 650px; padding: 40px; border-radius: 36px; backdrop-filter: var(--blur); box-shadow: 0 20px 60px rgba(0,0,0,0.8); }
 .freeze-card { background: rgba(10, 191, 255, 0.05); border: 1px solid rgba(10, 191, 255, 0.3); box-shadow: inset 0 0 20px rgba(10, 191, 255, 0.1), 0 20px 60px rgba(0,0,0,0.8); }
 .maint-card { background: rgba(255, 159, 10, 0.05); border: 1px solid rgba(255, 159, 10, 0.4); border-top: 4px solid #ff9f0a; box-shadow: inset 0 0 20px rgba(255, 159, 10, 0.1), 0 20px 60px rgba(0,0,0,0.8); }
+.reward-card { background: rgba(52, 199, 89, 0.05); border: 1px solid rgba(52, 199, 89, 0.4); border-top: 4px solid var(--success); box-shadow: inset 0 0 20px rgba(52, 199, 89, 0.1), 0 20px 60px rgba(0,0,0,0.8); }
+
 .overlay-content-box h2 { margin: 0 0 16px 0; color: var(--text-primary); font-size: 28px; line-height: 1.3; font-weight: 700; letter-spacing: -0.02em; }
 .overlay-content-box p { margin: 0; color: var(--text-secondary); font-size: 16px; line-height: 1.5; font-weight: 500; }
 @keyframes slowPulse { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.05); } }
@@ -395,6 +410,9 @@ body {
 
 .key-box { background: var(--input-bg); border: 1px solid var(--input-border); padding: 16px; border-radius: 16px; font-family: monospace; font-size: 18px; font-weight: 700; letter-spacing: 2px; text-align: center; color: var(--accent); margin: 12px 0; user-select: all; }
 
+/* CAPTCHA STYLING */
+.captcha-box { background: rgba(0,0,0,0.3); border: 1px solid var(--input-border); border-radius: 14px; padding: 12px 16px; color: var(--text-primary); font-weight: bold; width: 45%; text-align: center; letter-spacing: 2px; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
+
 @media (max-width: 900px) {
   .top-bar { padding: 16px 20px; } .dashboard-layout { flex-direction: column; width: 100%; padding: 0; }
   .sidebar { flex: none; width: 100%; padding: 16px; border-radius: 24px; } .sidebar h2 { display: none; }
@@ -410,10 +428,14 @@ body {
   <canvas id="bgCanvas"></canvas>
   <div class="ocean"><div class="wave"></div><div class="wave"></div><div class="wave"></div></div>
 
+  <!-- Custom Confirm / Prompt Modal -->
   <div class="modal-overlay" id="customModalOverlay">
     <div class="custom-modal">
       <h3 id="modalTitle">Title</h3>
       <p id="modalMessage">Message</p>
+      <!-- Prompt input (hidden by default) -->
+      <input type="text" id="modalInput" class="dev-select" style="display:none; width: 100%; margin-bottom: 16px; padding: 10px;" placeholder="Message for user..." autocomplete="off"/>
+      
       <div class="modal-btns">
         <button class="modal-btn modal-btn-cancel" id="modalCancelBtn" data-i18n="m_cancel">Cancel</button>
         <button class="modal-btn modal-btn-confirm" id="modalConfirmBtn" data-i18n="m_confirm">Confirm</button>
@@ -421,6 +443,7 @@ body {
     </div>
   </div>
 
+  <!-- ЭКРАН ЗАМОРОЗКИ -->
   <div class="fullscreen-overlay" id="freezeScreen" style="display:none;">
       <div class="bg-massive-icon">❄️</div>
       <div class="overlay-content-box freeze-card">
@@ -429,11 +452,28 @@ body {
       </div>
   </div>
 
+  <!-- ЭКРАН ТЕХ. РАБОТ -->
   <div class="fullscreen-overlay" id="maintenanceScreen" style="display:none;">
       <div class="bg-massive-icon" id="maintenanceLockIcon">🔒</div>
       <div class="overlay-content-box maint-card">
           <h2 data-i18n="mn_tit">The site is temporarily closed for maintenance.</h2>
           <p data-i18n="mn_desc">Please try visiting this site at another time!</p>
+      </div>
+  </div>
+
+  <!-- ЭКРАН НАГРАДЫ ОТ РАЗРАБОТЧИКА (DEEP FOCUS) -->
+  <div class="fullscreen-overlay" id="rewardScreen" style="display:none; z-index: 2001;">
+      <div class="bg-massive-icon">🎉</div>
+      <div class="overlay-content-box reward-card">
+          <h2 data-i18n="r_tit" style="color: var(--success);">Congratulations!</h2>
+          <p data-i18n="r_sub" style="margin-bottom: 6px; font-weight: 700; color: #fff;">You received from the developer:</p>
+          <p id="rewardValue" style="opacity: 0.6; margin-bottom: 24px; font-size: 14px;">Value</p>
+          
+          <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 14px; margin-bottom: 24px; text-align: left;">
+              <span data-i18n="r_dev" style="font-weight: 700; color: var(--success);">Developer: </span>
+              <span id="rewardMessage" style="color: #fff;">Message</span>
+          </div>
+          <button class="action-btn" style="width: 100%; background: var(--success); color: #fff;" onclick="closeRewardScreen()" data-i18n="r_btn">Okay!</button>
       </div>
   </div>
 
@@ -499,6 +539,13 @@ body {
       <input type="text" id="regEmail" class="email-input" data-i18n-ph="email_ph" placeholder="Enter your email to protect against bots (Optional)" autocomplete="off" />
       <input type="password" id="regSecret" data-i18n-ph="reg_sec_ph" placeholder="Secret word if you forgot password" autocomplete="off" />
       <input type="text" id="regSource" data-i18n-ph="reg_src_ph" placeholder="How did you hear about us?" autocomplete="off" />
+      
+      <!-- НОВАЯ КАПЧА АНТИ-БОТ -->
+      <div style="display: flex; gap: 10px; width: 100%; margin-top: 4px;">
+          <div id="captchaBox" class="captcha-box">? + ?</div>
+          <input type="text" id="regCaptcha" data-i18n-ph="captcha_ph" placeholder="Answer" style="flex: 1;" autocomplete="off" />
+      </div>
+
       <label class="checkbox-container"><input type="checkbox" id="regAgree"><span data-i18n="agree">I agree to the privacy cookies and am ready to create an account</span></label>
       <button id="regBtn" disabled data-i18n="create_btn">CREATE ACCOUNT</button>
       <div id="regMessage"></div>
@@ -692,7 +739,9 @@ body {
       login_ph: "Login", pass_ph: "Password", secret_ph: "Secret Word", code_ph: "Enter Code", email_ph: "Enter your email to protect against bots (Optional)",
       reg_sec_ph: "Secret word if you forgot password", reg_src_ph: "How did you hear about us?",
       m_cancel: "Cancel", m_confirm: "Confirm",
-      disc_club: "Global Scripts Club", disc_desc: "We discuss, we create, we calculate. Join to follow updates and chat with other people!", disc_join: "Join the Club"
+      disc_club: "Global Scripts Club", disc_desc: "We discuss, we create, we calculate. Join to follow updates and chat with other people!", disc_join: "Join the Club",
+      captcha_ph: "Enter answer", captcha_err: "Wrong captcha!", r_tit: "Congratulations!", r_sub: "You received from the developer:",
+      r_dev: "Developer: ", r_btn: "Okay!", prompt_msg: "Enter message for the user:"
     },
     ru: {
       theme_btn: "Светлая тема", logout: "Выйти", auth_btn: "АВТОРИЗАЦИЯ", no_acc: "Нет аккаунта? Создайте!",
@@ -721,7 +770,9 @@ body {
       login_ph: "Логин", pass_ph: "Пароль", secret_ph: "Секретное слово", code_ph: "Введите код", email_ph: "Введите почту для защиты от ботов (Не обяз.)",
       reg_sec_ph: "Секретное слово если забыли пароль", reg_src_ph: "Откуда вы узнали про нас?",
       m_cancel: "Отмена", m_confirm: "Подтвердить",
-      disc_club: "Global Scripts Club", disc_desc: "Мы обсуждаем, мы создаем, мы рассчитываем. Вступи чтобы следить за обновлениями и общаться с другими людьми!", disc_join: "Зайти в клуб"
+      disc_club: "Global Scripts Club", disc_desc: "Мы обсуждаем, мы создаем, мы рассчитываем. Вступи чтобы следить за обновлениями и общаться с другими людьми!", disc_join: "Зайти в клуб",
+      captcha_ph: "Введите ответ", captcha_err: "Неверная капча!", r_tit: "Поздравляем!", r_sub: "Вы получили от разработчика:",
+      r_dev: "Разработчик: ", r_btn: "Хорошо!", prompt_msg: "Введите сообщение для пользователя:"
     },
     ja: {
       theme_btn: "ライトテーマ", logout: "ログアウト", auth_btn: "承認する", no_acc: "アカウントがありませんか？作成！",
@@ -750,7 +801,9 @@ body {
       login_ph: "ログイン", pass_ph: "パスワード", secret_ph: "秘密の言葉", code_ph: "コードを入力", email_ph: "メールアドレスを入力 (任意)",
       reg_sec_ph: "忘れた場合の秘密の言葉", reg_src_ph: "どこで知りましたか？",
       m_cancel: "キャンセル", m_confirm: "確認",
-      disc_club: "Global Scripts Club", disc_desc: "私たちは議論し、作成し、計算します。参加して最新情報をチェックし、他の人とチャットしましょう！", disc_join: "クラブに参加する"
+      disc_club: "Global Scripts Club", disc_desc: "私たちは議論し、作成し、計算します。参加して最新情報をチェックし、他の人とチャットしましょう！", disc_join: "クラブに参加する",
+      captcha_ph: "答えを入力", captcha_err: "間違ったキャプチャ！", r_tit: "おめでとうございます！", r_sub: "開発者から受け取りました:",
+      r_dev: "開発者: ", r_btn: "はい！", prompt_msg: "ユーザーへのメッセージを入力:"
     },
     pt: {
       theme_btn: "Modo Claro", logout: "Sair", auth_btn: "AUTORIZAR", no_acc: "Não tem uma conta? Crie uma!",
@@ -779,11 +832,16 @@ body {
       login_ph: "Login", pass_ph: "Senha", secret_ph: "Palavra Secreta", code_ph: "Insira o Código", email_ph: "Email (Opcional)",
       reg_sec_ph: "Palavra de recuperação", reg_src_ph: "Como nos conheceu?",
       m_cancel: "Cancelar", m_confirm: "Confirmar",
-      disc_club: "Global Scripts Club", disc_desc: "Nós discutimos, criamos e calculamos. Junte-se para acompanhar as atualizações e conversar com outras pessoas!", disc_join: "Entrar no clube"
+      disc_club: "Global Scripts Club", disc_desc: "Nós discutimos, criamos e calculamos. Junte-se para acompanhar as atualizações e conversar com outras pessoas!", disc_join: "Entrar no clube",
+      captcha_ph: "Insira a resposta", captcha_err: "Captcha incorreto!", r_tit: "Parabéns!", r_sub: "Você recebeu do desenvolvedor:",
+      r_dev: "Desenvolvedor: ", r_btn: "OK!", prompt_msg: "Digite a mensagem para o usuário:"
     }
   };
 
+  let currentLang = 'en';
+
   function setLang(lang) {
+    currentLang = lang;
     localStorage.setItem('lang', lang);
     const map = { en: "🌎 EN", ru: "🇷🇺 RU", ja: "🇯🇵 JA", pt: "🇧🇷 PT" };
     document.getElementById('langBtnText').innerText = map[lang];
@@ -806,7 +864,7 @@ body {
 
   let confirmActionCallback = null;
 
-  function showConfirm(title, message, confirmText, isDanger, callback, hideCancel = false) {
+  function showConfirm(title, message, confirmText, isDanger, callback, hideCancel = false, isPrompt = false) {
       document.getElementById('modalTitle').innerText = title;
       document.getElementById('modalMessage').innerText = message;
       
@@ -816,6 +874,14 @@ body {
       
       document.getElementById('modalCancelBtn').style.display = hideCancel ? 'none' : 'block';
       
+      const promptInput = document.getElementById('modalInput');
+      if(isPrompt) {
+          promptInput.style.display = 'block';
+          promptInput.value = '';
+      } else {
+          promptInput.style.display = 'none';
+      }
+
       confirmActionCallback = callback;
       document.getElementById('customModalOverlay').classList.add('active');
   }
@@ -827,7 +893,8 @@ body {
 
   document.getElementById('modalCancelBtn').addEventListener('click', closeConfirm);
   document.getElementById('modalConfirmBtn').addEventListener('click', () => {
-      if(confirmActionCallback) confirmActionCallback();
+      const val = document.getElementById('modalInput').value.trim();
+      if(confirmActionCallback) confirmActionCallback(val);
       closeConfirm();
   });
 
@@ -881,16 +948,15 @@ body {
     else { document.getElementById('btnMyPlan').classList.add('active'); document.getElementById('planMySection').style.display = 'block'; }
   }
 
-  // АДМИН-ФУНКЦИИ
+  // АДМИН-ФУНКЦИИ С НАГРАДАМИ
   let isSiteMaintenance = false;
   function loadAdminPanel(devApproved) {
      if (devApproved !== 'Yes') return;
-     
      document.getElementById('devForceKeyBtn').style.display = 'block';
-     
      document.getElementById('devUserView').style.display = 'none'; document.getElementById('devAdminView').style.display = 'flex';
      refreshAdminData(); setInterval(refreshConsoleLogs, 3000);
   }
+  
   function refreshAdminData() {
      fetch('/admin/get_users').then(res => res.json()).then(data => {
         if(data.success) {
@@ -902,12 +968,13 @@ body {
            data.users.forEach(u => {
               const freezeText = u.is_frozen === 'Yes' ? 'Unfreeze' : 'Freeze';
               const freezeClass = u.is_frozen === 'Yes' ? 'dev-btn-sm dev-btn-danger' : 'dev-btn-sm dev-btn-freeze';
-              tbody.innerHTML += `<tr><td><b>${u.login}</b></td><td>${u.plan}</td><td>${u.plan_days} d</td><td><select class="dev-select" onchange="adminChangePlan('${u.login}', this.value)"><option value="" selected disabled>Select plan</option><option value="Starter Plan">Starter</option><option value="Professional Plan">Professional</option><option value="Extreme Plan">Extreme</option></select></td><td><div style="display:flex; gap:8px;"><button class="dev-btn-sm" onclick="adminAddDays('${u.login}')">+7 Days</button><button class="${freezeClass}" onclick="adminToggleFreeze('${u.login}')">${freezeText}</button><button class="dev-btn-sm dev-btn-danger" onclick="requestAdminDeleteUser('${u.login}')">Delete</button></div></td></tr>`;
+              tbody.innerHTML += `<tr><td><b>${u.login}</b></td><td>${u.plan}</td><td>${u.plan_days} d</td><td><select class="dev-select" onchange="promptAdminChangePlan('${u.login}', this.value)"><option value="" selected disabled>Select plan</option><option value="Starter Plan">Starter</option><option value="Professional Plan">Professional</option><option value="Extreme Plan">Extreme</option></select></td><td><div style="display:flex; gap:8px;"><button class="dev-btn-sm" onclick="promptAdminAddDays('${u.login}')">+7 Days</button><button class="${freezeClass}" onclick="adminToggleFreeze('${u.login}')">${freezeText}</button><button class="dev-btn-sm dev-btn-danger" onclick="requestAdminDeleteUser('${u.login}')">Delete</button></div></td></tr>`;
            });
         }
      });
      refreshConsoleLogs();
   }
+  
   function refreshConsoleLogs() {
      fetch('/admin/get_logs').then(res => res.json()).then(data => {
         if(data.success) {
@@ -916,8 +983,20 @@ body {
         }
      });
   }
-  function adminChangePlan(login, newPlan) { fetch('/admin/change_plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login, plan: newPlan }) }).then(res => res.json()).then(data => { if(data.success) refreshAdminData(); }); }
-  function adminAddDays(login) { fetch('/admin/add_days', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login }) }).then(res => res.json()).then(data => { if(data.success) refreshAdminData(); }); }
+
+  function promptAdminChangePlan(login, newPlan) {
+      if(!newPlan) return;
+      showConfirm('Update Plan', i18n[currentLang].prompt_msg, 'Update', false, (msg) => {
+          fetch('/admin/change_plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: login, plan: newPlan, message: msg || 'Enjoy!' }) }).then(res => res.json()).then(data => { if(data.success) refreshAdminData(); });
+      }, false, true);
+  }
+
+  function promptAdminAddDays(login) {
+      showConfirm('Add +7 Days', i18n[currentLang].prompt_msg, 'Add', false, (msg) => {
+          fetch('/admin/add_days', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: login, message: msg || 'Keep up the good work!' }) }).then(res => res.json()).then(data => { if(data.success) refreshAdminData(); });
+      }, false, true);
+  }
+
   function adminToggleFreeze(login) { fetch('/admin/toggle_freeze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login }) }).then(res => res.json()).then(data => { if(data.success) refreshAdminData(); else showConfirm('Error', data.message, 'OK', false, null, true); }); }
   function adminToggleMaintenance() { fetch('/admin/toggle_maintenance', { method: 'POST' }).then(res => res.json()).then(data => { if(data.success) refreshAdminData(); }); }
 
@@ -931,10 +1010,7 @@ body {
       const link = document.getElementById('devDiscordLink').value.trim();
       fetch('/admin/update_discord', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ link })
       }).then(res => res.json()).then(data => {
-          if(data.success) {
-              document.getElementById('discordJoinBtn').href = link;
-              showConfirm('Success', 'Discord link updated successfully!', 'OK', false, null, true);
-          }
+          if(data.success) { document.getElementById('discordJoinBtn').href = link; showConfirm('Success', 'Discord link updated successfully!', 'OK', false, null, true); }
       });
   }
 
@@ -946,6 +1022,20 @@ body {
     });
   }
 
+  function closeRewardScreen() {
+      fetch('/api/clear_reward', { method: 'POST' }).then(() => {
+          document.getElementById('rewardScreen').style.display = 'none';
+      });
+  }
+
+  function loadCaptcha() {
+      fetch('/api/captcha').then(res => res.json()).then(data => {
+          document.getElementById('captchaBox').innerText = data.text;
+          document.getElementById('regCaptcha').value = '';
+      });
+  }
+
+  // LIQUID PHYSICS
   const canvas = document.getElementById('bgCanvas'); const ctx = canvas.getContext('2d');
   let width, height, particles = [], mouse = { x: -1000, y: -1000 }, currentDotColor = 'rgba(255, 255, 255, 0.3)', isErrorState = false, globalSpeedBoost = 0, isSystemLoading = false; 
   function updateCanvasColor() { currentDotColor = getComputedStyle(document.body).getPropertyValue('--dot-color').trim(); }
@@ -1015,11 +1105,7 @@ body {
     const twoFaForm = document.getElementById('twoFaForm');
     const createAccountWrapper = document.getElementById('createAccountWrapper');
     
-    if ({{ show_freeze }}) {
-        appMainWrapper.style.display = 'none';
-        document.getElementById('freezeScreen').style.display = 'flex';
-        return;
-    }
+    if ({{ show_freeze }}) { appMainWrapper.style.display = 'none'; document.getElementById('freezeScreen').style.display = 'flex'; return; }
     
     if ({{ show_maintenance }}) {
         appMainWrapper.style.display = 'none';
@@ -1032,7 +1118,7 @@ body {
         return;
     }
 
-    document.getElementById('createAccountLink').addEventListener('click', () => { authForm.style.display = 'none'; regForm.style.display = 'flex'; globalSpeedBoost = 20; });
+    document.getElementById('createAccountLink').addEventListener('click', () => { authForm.style.display = 'none'; regForm.style.display = 'flex'; loadCaptcha(); globalSpeedBoost = 20; });
     document.getElementById('backToLoginLink').addEventListener('click', () => { regForm.style.display = 'none'; authForm.style.display = 'flex'; globalSpeedBoost = 20; createAccountWrapper.classList.remove('show'); hideMessage('message'); });
     document.getElementById('cancelSecretLink').addEventListener('click', () => { secretForm.style.display = 'none'; authForm.style.display = 'flex'; globalSpeedBoost = 20; });
     document.getElementById('cancel2FaLink').addEventListener('click', () => { twoFaForm.style.display = 'none'; authForm.style.display = 'flex'; });
@@ -1045,15 +1131,16 @@ body {
       const login = document.getElementById('regLogin').value.trim(); const password = document.getElementById('regPassword').value;
       const email = document.getElementById('regEmail').value.trim(); const secret = document.getElementById('regSecret').value.trim();
       const source = document.getElementById('regSource').value.trim();
+      const captcha = document.getElementById('regCaptcha').value.trim();
 
-      if (!login || !password || !secret || !source) { showMessage('regMessage', 'Please fill all required fields.', false); return; }
+      if (!login || !password || !secret || !source || !captcha) { showMessage('regMessage', 'Please fill all required fields.', false); return; }
 
-      fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login, password, email, secret, source })
+      fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login, password, email, secret, source, captcha })
       }).then(res => res.json()).then(data => {
         if (data.success) {
           showMessage('regMessage', 'Account created successfully!', true);
           setTimeout(() => { regForm.style.display = 'none'; authForm.style.display = 'flex'; document.getElementById('login').value = login; hideMessage('regMessage'); createAccountWrapper.classList.remove('show'); hideMessage('message'); }, 1500);
-        } else { showMessage('regMessage', data.message, false); }
+        } else { showMessage('regMessage', data.message, false); loadCaptcha(); triggerErrorAnimation(regForm); }
       });
     });
 
@@ -1067,7 +1154,20 @@ body {
             if(data.success) {
                 if(data.is_frozen === 'Yes') { window.location.reload(); }
                 
-                // Отображение активного ключа, если он есть
+                if(data.pending_reward && data.pending_reward.type) {
+                    const rType = data.pending_reward.type;
+                    const rVal = data.pending_reward.value;
+                    const rMsg = data.pending_reward.msg;
+                    
+                    let valText = "";
+                    if (rType === "plan") valText = i18n[currentLang].p_upg + ": " + rVal;
+                    if (rType === "days") valText = "+7 Days";
+                    
+                    document.getElementById('rewardValue').innerText = valText;
+                    document.getElementById('rewardMessage').innerText = rMsg;
+                    document.getElementById('rewardScreen').style.display = 'flex';
+                }
+                
                 if(data.active_key) {
                     const display = document.getElementById('generatedKeyDisplay');
                     display.innerText = data.active_key;
@@ -1169,6 +1269,23 @@ def index():
     
     return render_template_string(TEMPLATE, current_user=session.get('user'), show_maintenance=show_maintenance, show_freeze=show_freeze, discord_link=discord_link)
 
+@app.route('/api/captcha')
+def get_captcha():
+    a = random.randint(1, 9)
+    b = random.randint(1, 9)
+    session['captcha_answer'] = str(a + b)
+    return jsonify({"text": f"{a} + {b} = ?"})
+
+@app.route('/api/clear_reward', methods=['POST'])
+def clear_reward():
+    current_user = session.get('user')
+    if current_user:
+        conn = get_db_connection()
+        conn.execute("UPDATE users SET pending_reward = '' WHERE login = ?", (current_user,))
+        conn.commit()
+        conn.close()
+    return jsonify({"success": True})
+
 @app.route('/get_time')
 def get_time():
     tz = pytz.timezone('Europe/Moscow')
@@ -1187,7 +1304,6 @@ def get_user_info():
     conn = get_db_connection()
     user = conn.execute("SELECT * FROM users WHERE login = ?", (current_user,)).fetchone()
     
-    # Ищем последний ключ пользователя и проверяем, жив ли он
     active_key = None
     latest_key_row = conn.execute("SELECT key_code, expires_at FROM keys WHERE user_login = ? ORDER BY id DESC LIMIT 1", (current_user,)).fetchone()
     if latest_key_row:
@@ -1208,6 +1324,14 @@ def get_user_info():
             f"Mainframe core is fully synchronized. Greetings, {user['login']}!",
             f"Root privileges granted. Active session: Developer {user['login']}."
         ]
+        
+        pending_reward_data = {}
+        if user['pending_reward']:
+            try:
+                pending_reward_data = json.loads(user['pending_reward'])
+            except:
+                pass
+
         return jsonify({
             'success': True,
             'login': user['login'],
@@ -1216,6 +1340,7 @@ def get_user_info():
             'reg_date': user['reg_date'],
             'dev_approved': user['dev_approved'],
             'is_frozen': user['is_frozen'],
+            'pending_reward': pending_reward_data,
             'active_key': active_key,
             'greeting': random.choice(greetings),
             'dev_greeting': random.choice(dev_greetings)
@@ -1337,8 +1462,13 @@ def register():
     email_input = data.get('email', '').strip()
     secret_input = data.get('secret', '').strip()
     source_input = data.get('source', '').strip()
+    captcha_input = data.get('captcha', '').strip()
     
     c_log('INFO', f"Registration attempt with username: {login_input}")
+
+    if session.get('captcha_answer') != captcha_input:
+        c_log('WARNING', f"Registration failed. Invalid captcha for {login_input}.")
+        return jsonify({'success': False, 'message': 'Invalid Captcha! Try again.'})
 
     conn = get_db_connection()
     if conn.execute("SELECT id FROM users WHERE login = ?", (login_input,)).fetchone():
@@ -1350,16 +1480,16 @@ def register():
     reg_date = datetime.now(tz).strftime('%d.%m.%Y')
 
     conn.execute('''
-        INSERT INTO users (login, password_hash, email, secret, source, reg_date, plan, plan_days, dev_approved, is_frozen)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (login_input, generate_password_hash(password_input), email_input, secret_input, source_input, reg_date, 'Free Tier', 0, 'No', 'No'))
+        INSERT INTO users (login, password_hash, email, secret, source, reg_date, plan, plan_days, dev_approved, is_frozen, pending_reward)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (login_input, generate_password_hash(password_input), email_input, secret_input, source_input, reg_date, 'Free Tier', 0, 'No', 'No', ''))
     conn.commit()
     conn.close()
     
+    session.pop('captcha_answer', None)
     c_log('SUCCESS', f"New account created successfully for {login_input}.")
     return jsonify({'success': True})
 
-# --- ЭНДПОИНТ ГЕНЕРАЦИИ КЛЮЧА ---
 @app.route('/generate_key', methods=['POST'])
 def generate_key():
     current_user = session.get('user')
@@ -1384,7 +1514,6 @@ def generate_key():
                 conn.close()
                 return jsonify({'success': False, 'message': f'Please wait {hours}h {minutes}m before generating a new key.'})
 
-    # Определение префикса по плану
     plan = user['plan']
     prefix = "FREE"
     if 'Starter' in plan: prefix = "STARTER"
@@ -1416,26 +1545,20 @@ def generate_key():
         
     return jsonify({'success': True, 'key': key_code})
 
-# --- ПУБЛИЧНЫЙ API ДЛЯ ROBLOX LUA ---
-@app.route('/api/verify_key', methods=['POST', 'GET'])
-def api_verify_key():
-    if request.method == 'POST':
-        data = request.get_json() or {}
-        key_input = data.get('key', '').strip()
-        hwid_input = data.get('hwid', '').strip()
-    else:
-        key_input = request.args.get('key', '').strip()
-        hwid_input = request.args.get('hwid', '').strip()
+@app.route('/api/mobile_verify', methods=['GET'])
+def mobile_verify():
+    key_input = request.args.get('key', '').strip()
+    hwid_input = request.args.get('hwid', '').strip()
 
-    if not key_input: return jsonify({'valid': False, 'message': 'No key provided.'})
+    if not key_input: return "ERROR|No key provided"
 
     conn = get_db_connection()
     key_row = conn.execute("SELECT * FROM keys WHERE key_code = ?", (key_input,)).fetchone()
     
     if not key_row:
         conn.close()
-        c_log('WARNING', f"Roblox API: Invalid key attempt -> {key_input}")
-        return jsonify({'valid': False, 'message': 'Invalid key!'})
+        c_log('WARNING', f"Mobile API: Invalid key attempt -> {key_input}")
+        return "ERROR|Invalid key"
 
     tz = pytz.timezone('Europe/Moscow')
     now = datetime.now(tz)
@@ -1443,28 +1566,27 @@ def api_verify_key():
     
     if now > expires_time:
         conn.close()
-        c_log('WARNING', f"Roblox API: Expired key attempt -> {key_input}")
-        return jsonify({'valid': False, 'message': 'Key has expired! Please generate a new one on the website.'})
+        c_log('WARNING', f"Mobile API: Expired key attempt -> {key_input}")
+        return "ERROR|Key expired"
 
     user_row = conn.execute("SELECT is_frozen FROM users WHERE login = ?", (key_row['user_login'],)).fetchone()
     if user_row and user_row['is_frozen'] == 'Yes':
         conn.close()
-        c_log('WARNING', f"Roblox API: Frozen user key attempt -> {key_row['user_login']}")
-        return jsonify({'valid': False, 'message': 'User account is frozen!'})
+        c_log('WARNING', f"Mobile API: Frozen user key attempt -> {key_row['user_login']}")
+        return "ERROR|Account frozen"
 
     if key_row['hwid'] == '':
         conn.execute("UPDATE keys SET hwid = ? WHERE key_code = ?", (hwid_input, key_input))
         conn.commit()
     elif hwid_input and key_row['hwid'] != hwid_input:
         conn.close()
-        c_log('ERROR', f"Roblox API: HWID Mismatch for key {key_input}")
-        return jsonify({'valid': False, 'message': 'HWID Mismatch! Key bound to another PC.'})
+        c_log('ERROR', f"Mobile API: HWID Mismatch for key {key_input}")
+        return "ERROR|HWID Mismatch"
 
     conn.close()
-    c_log('SUCCESS', f"Roblox API: Key verified -> {key_input} ({key_row['user_login']})")
-    return jsonify({'valid': True, 'user': key_row['user_login'], 'plan': key_row['plan'], 'expires': key_row['expires_at'], 'message': 'Access Granted!'})
+    c_log('SUCCESS', f"Mobile API: Key verified -> {key_input} ({key_row['user_login']})")
+    return f"SUCCESS|{key_row['user_login']}|{key_row['plan']}"
 
-# --- МАРШРУТЫ АДМИН-ПАНЕЛИ ---
 @app.route('/admin/get_users')
 def admin_get_users():
     current_user = session.get('user')
@@ -1499,17 +1621,25 @@ def admin_change_plan():
     if not check or check['dev_approved'] != 'Yes': conn.close(); return jsonify({'success': False}), 403
         
     data = request.get_json()
-    target_user = data.get('login'); new_plan = data.get('plan')
+    target_user = data.get('login')
+    new_plan = data.get('plan')
+    dev_msg = data.get('message', '')
     
     days = 0
     if 'Starter' in new_plan: days = 7
     elif 'Professional' in new_plan: days = 30
     elif 'Extreme' in new_plan: days = 90
     
-    conn.execute("UPDATE users SET plan = ?, plan_days = ? WHERE login = ?", (new_plan, days, target_user))
+    # 1. Задаем награду пользователю
+    reward_data = json.dumps({"type": "plan", "value": new_plan, "msg": dev_msg})
+    conn.execute("UPDATE users SET plan = ?, plan_days = ?, pending_reward = ? WHERE login = ?", (new_plan, days, reward_data, target_user))
+    
+    # 2. УДАЛЯЕМ ЕГО СТАРЫЙ КЛЮЧ (чтобы сгенерировался новый с правильной приставкой)
+    conn.execute("DELETE FROM keys WHERE user_login = ?", (target_user,))
+    
     conn.commit()
     conn.close()
-    c_log('WARNING', f"Developer '{current_user}' updated '{target_user}' plan to '{new_plan}' ({days} days).")
+    c_log('WARNING', f"Developer '{current_user}' updated '{target_user}' plan to '{new_plan}' and revoked old keys.")
     return jsonify({'success': True})
 
 @app.route('/admin/add_days', methods=['POST'])
@@ -1521,8 +1651,11 @@ def admin_add_days():
         
     data = request.get_json()
     target_user = data.get('login')
+    dev_msg = data.get('message', '')
     
-    conn.execute("UPDATE users SET plan_days = plan_days + 7 WHERE login = ?", (target_user,))
+    reward_data = json.dumps({"type": "days", "value": "+7 Days", "msg": dev_msg})
+    
+    conn.execute("UPDATE users SET plan_days = plan_days + 7, pending_reward = ? WHERE login = ?", (reward_data, target_user))
     conn.commit()
     conn.close()
     c_log('WARNING', f"Developer '{current_user}' added +7 days to user '{target_user}'.")
