@@ -7,7 +7,7 @@ import smtplib
 import json
 import hashlib
 from email.mime.text import MIMEText
-from flask import Flask, render_template_string, request, jsonify, session, redirect
+from flask import Flask, render_template_string, request, jsonify, session, redirect, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import pytz
@@ -102,6 +102,13 @@ def init_db():
             banner_url TEXT NOT NULL, release_date TEXT NOT NULL, script_code TEXT NOT NULL, 
             description TEXT NOT NULL, is_frozen TEXT DEFAULT 'No')''')
 
+    cursor = conn.execute("PRAGMA table_info(scripts)")
+    script_cols = [col[1] for col in cursor.fetchall()]
+    if 'executors_info' not in script_cols: 
+        conn.execute("ALTER TABLE scripts ADD COLUMN executors_info TEXT DEFAULT ''")
+    if 'script_discord' not in script_cols: 
+        conn.execute("ALTER TABLE scripts ADD COLUMN script_discord TEXT DEFAULT ''")
+
     conn.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('maintenance', 'No')")
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('discord_link', 'https://discord.gg/')")
@@ -117,11 +124,12 @@ def init_db():
     if not s_cursor.fetchone():
         tz = pytz.timezone('Europe/Moscow')
         default_date = datetime.now(tz).strftime('%Y-%m-%dT%H:%M')
-        conn.execute('''INSERT INTO scripts (title, game, banner_url, release_date, script_code, description, is_frozen)
-            VALUES (?, ?, ?, ?, ?, ?, ?)''', 
+        conn.execute('''INSERT INTO scripts (title, game, banner_url, release_date, script_code, description, is_frozen, executors_info, script_discord)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
             ('Oxygen Hub Script', 'Muscle Legends', 'https://static.wikia.nocookie.net/muscle-legends/images/5/50/Wiki-background/revision/latest/scale-to-width-down/670', 
             default_date, 'loadstring(game:HttpGet("https://raw.githubusercontent.com/Rob4ik02/Muscle-Legends-Roblox/refs/heads/main/Muscle%20Legends/Sirius%20Library/Loader.lua"))()', 
-            'Good script, works in beta version. There are some bugs or errors. They say it will be updated.', 'No'))
+            'Good script, works in beta version. There are some bugs or errors. They say it will be updated.', 'No', 
+            'Delta - Working! | sUNC - 100%, Last update: 26.07.2026\nWave - Not working.', 'https://discord.gg/'))
 
     conn.commit(); conn.close()
     c_log('SUCCESS', "Database loaded successfully.")
@@ -141,7 +149,6 @@ TEMPLATE = '''
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="anypay-verification" content="7641a8b9610252ee169f2815a5c2" />
 <title>Global Script's Hub</title>
-<!-- ФАВИКОНКА -->
 <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/Rob4ik02/Global-Scripts-Development/refs/heads/main/Icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
@@ -155,8 +162,7 @@ TEMPLATE = '''
   --shadow-drop: 0 15px 35px rgba(0,0,0,0.4);
   --shadow-inner: inset 0 1px 1px rgba(255, 255, 255, 0.1); 
   --blur: blur(20px) saturate(150%);
-  --dot-color: rgba(255, 255, 255, 0.3); --wave-1: rgba(255, 255, 255, 0.03);
-  --wave-2: rgba(255, 255, 255, 0.015); --wave-3: rgba(255, 255, 255, 0.005);
+  --dot-color: rgba(255, 255, 255, 0.3);
 }
 
 [data-theme="light"] {
@@ -165,79 +171,57 @@ TEMPLATE = '''
   --card-border: rgba(0, 0, 0, 0.05); --input-bg: rgba(255, 255, 255, 0.6);
   --input-border: rgba(0, 0, 0, 0.08); --accent: #1d1d1f; --accent-text: #ffffff;
   --shadow-drop: 0 12px 30px rgba(0, 0, 0, 0.08); --shadow-inner: inset 0 1px 1px rgba(255, 255, 255, 0.8);
-  --dot-color: rgba(0, 0, 0, 0.2); --wave-1: rgba(0, 0, 0, 0.03); --wave-2: rgba(0, 0, 0, 0.015); --wave-3: rgba(0, 0, 0, 0.005);
+  --dot-color: rgba(0, 0, 0, 0.2);
 }
 
 /* Инверсия логотипа при белой теме */
-[data-theme="light"] .header img {
-  filter: invert(1);
-}
+[data-theme="light"] .header img, [data-theme="light"] .landing-logo-container img { filter: invert(1); }
+[data-theme="light"] #bigEyeContainer path { fill: rgba(255, 255, 255, 0.8); stroke: rgba(0,0,0,0.1); }
 
 * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
 html, body { height: 100%; min-height: 100vh; margin: 0; padding: 0; }
 
-/* АНТИ-КРАЖА: ЗАПРЕТ ВЫДЕЛЕНИЯ ТЕКСТА */
-body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-primary); transition: background-color 0.6s ease, color 0.6s ease; overflow-x: hidden; overflow-y: auto; background-attachment: fixed; perspective: 1000px; user-select: none; -webkit-user-select: none; }
+/* АНТИ-КРАЖА */
+body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background-color: var(--bg-color); color: var(--text-primary); transition: background-color 0.6s ease, color 0.6s ease; overflow-x: hidden; overflow-y: auto; background-attachment: fixed; perspective: 1000px; user-select: none; -webkit-user-select: none; }
 input, textarea, .web-console, .chat-msg { user-select: text; -webkit-user-select: text; }
 
 /* -------------------------------------
-   DRAGON INTRO (Неоновая длинная сосиска)
+   BIG EYE ANIMATION
+-------------------------------------- */
+.big-eye-container { height: 0; opacity: 0; transform: scale(0.5); transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1); display: flex; justify-content: center; align-items: center; overflow: hidden; margin-bottom: 0; width: 100%; }
+.big-eye-container.show { height: 40px; opacity: 1; transform: scale(1); margin-bottom: 12px; }
+.big-eye-svg { width: 60px; height: 35px; filter: drop-shadow(0 0 10px rgba(255,255,255,0.2)); }
+
+/* -------------------------------------
+   DRAGON INTRO
 -------------------------------------- */
 #introOverlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 99999; display: flex; justify-content: center; align-items: center; overflow: hidden; transition: opacity 0.8s ease, visibility 0.8s; }
 .dragon-container { display: flex; flex-direction: column; align-items: center; gap: 30px; width: 100%; }
 .dragon-container h2 { color: #fff; font-weight: 800; letter-spacing: 10px; font-size: 32px; margin: 0; text-shadow: 0 0 20px rgba(255,255,255,0.5); }
-
-.dragon-track { position: relative; width: 400px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; }
-.white-dragon { position: absolute; top: 0; left: -250px; width: 200px; height: 100%; background: linear-gradient(90deg, transparent, #ffffff, #ffffff); box-shadow: 0 0 20px #ffffff, 0 0 40px #ffffff; border-radius: 4px; animation: dragonFlight 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-@keyframes dragonFlight { 0% { left: -250px; } 100% { left: 400px; } }
+.dragon-track { position: relative; width: 300px; height: 3px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+.white-dragon { position: absolute; top: 0; left: -150px; width: 150px; height: 100%; background: linear-gradient(90deg, transparent, #ffffff, #ffffff); box-shadow: 0 0 15px #ffffff, 0 0 30px #ffffff; border-radius: 3px; animation: dragonFlight 1.2s infinite linear; }
+@keyframes dragonFlight { 0% { left: -150px; } 100% { left: 300px; } }
 
 /* -------------------------------------
    PARTICLE BURST (Nothing Style)
 -------------------------------------- */
 button { position: relative; overflow: hidden; }
-.btn-particle {
-    position: absolute;
-    width: 6px; height: 6px;
-    background: var(--text-primary);
-    border-radius: 50%;
-    pointer-events: none;
-    transform: translate(-50%, -50%);
-    animation: particleBurst 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    z-index: 10;
-}
+.btn-particle { position: absolute; width: 6px; height: 6px; background: var(--text-primary); border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); animation: particleBurst 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; z-index: 10; }
 .login-to-start-btn .btn-particle, .action-btn:not(.modal-btn-cancel) .btn-particle, .copy-btn:not(:disabled) .btn-particle { background: var(--bg-color); }
-@keyframes particleBurst {
-    0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-    100% { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(0); opacity: 0; }
-}
+@keyframes particleBurst { 0% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(0); opacity: 0; } }
 
 /* -------------------------------------
-   LANDING PREVIEW (Glassmorphism & Tilt)
+   LANDING PREVIEW
 -------------------------------------- */
-#landingWrapper { display: none; flex-direction: column; align-items: center; width: 100%; min-height: 100vh; padding: 100px 20px 40px; animation: fadeInLanding 1s ease forwards; position: relative; z-index: 10; transition: opacity 0.6s ease; }
+#landingWrapper { display: none; flex-direction: column; align-items: center; width: 100%; min-height: 100vh; padding: 100px 20px 40px; position: relative; z-index: 10; transition: opacity 0.6s ease; justify-content: center; }
+.landing-hero { text-align: center; max-width: 800px; margin-top: 40px; margin-bottom: 50px; animation: fadeInLanding 1s ease forwards; }
 @keyframes fadeInLanding { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-.landing-hero { text-align: center; max-width: 800px; margin-top: 40px; margin-bottom: 50px; }
 .landing-hero h1 { font-size: 64px; font-weight: 800; letter-spacing: -0.04em; margin-bottom: 20px; background: linear-gradient(135deg, #fff 30%, #888); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 .landing-hero p { font-size: 20px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 40px; }
-.feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; width: 100%; max-width: 1100px; margin-bottom: 60px; perspective: 1200px; }
+.feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; width: 100%; max-width: 1100px; margin-bottom: 60px; perspective: 1200px; animation: fadeInLanding 1s ease 0.2s forwards; opacity: 0; }
 
-/* 3D Glassmorphism Cards - Фиксируем базовое состояние */
-.feature-box, .script-card, .plan-card, .dashboard-card {
-    background: var(--card-bg);
-    backdrop-filter: var(--blur);
-    border: 1px solid var(--card-border);
-    border-radius: 24px;
-    box-shadow: var(--shadow-drop), var(--shadow-inner);
-    padding: 26px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    text-align: left;
-    transform: perspective(1200px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1);
-    transition: transform 0.4s ease-out, box-shadow 0.4s ease;
-    transform-style: preserve-3d; 
-    will-change: transform;
-}
+/* 3D Glassmorphism Cards */
+.feature-box, .script-card, .plan-card, .dashboard-card { background: var(--card-bg); backdrop-filter: var(--blur); border: 1px solid var(--card-border); border-radius: 24px; box-shadow: var(--shadow-drop), var(--shadow-inner); padding: 26px; display: flex; flex-direction: column; gap: 12px; text-align: left; transform: perspective(1200px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1); transition: transform 0.4s ease-out, box-shadow 0.4s ease; transform-style: preserve-3d; will-change: transform; }
 .feature-box h3, .feature-box p, .script-header, .plan-card h4, .plan-card .price { transform: translateZ(20px); }
 .feature-box i { transform: translateZ(30px); }
 
@@ -256,7 +240,7 @@ button { position: relative; overflow: hidden; }
 @keyframes drift { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes fadeInCanvas { to { opacity: 1; } }
 
-.app-content { display: none; flex-direction: column; align-items: center; width: 100%; min-height: 100vh; padding: 100px 20px 40px 20px; animation: liquidReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.app-content { display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; min-height: 100vh; padding: 80px 20px 40px 20px; animation: liquidReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 @keyframes liquidReveal { 0% { opacity: 0; transform: translateY(20px) scale(0.98); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes elasticBounce { 0% { transform: scale(0.97) translateY(10px); opacity: 0; } 50% { transform: scale(1.01) translateY(-2px); opacity: 1; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
 @keyframes errorShake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
@@ -277,14 +261,14 @@ button { position: relative; overflow: hidden; }
 @keyframes liquidBlink { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.8); } }
 .logout-btn { color: var(--error); } .logout-btn:hover { background: var(--error); color: #fff; }
 
-.header { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 24px; margin-top: auto; }
+.header { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 24px; width: 100%; }
 .header img { width: 72px; height: 72px; border-radius: 20px; box-shadow: var(--shadow-drop); border: 1px solid var(--card-border); transition: transform 0.5s; }
 .header img:hover { transform: scale(1.1) rotate(4deg); }
-.header h1 { margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -0.04em; }
+.header h1 { margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -0.04em; text-align: center; }
 
-.form-container { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; background: var(--card-bg); backdrop-filter: var(--blur); padding: 24px; border: 1px solid var(--card-border); border-radius: 28px; box-shadow: var(--shadow-drop); width: 100%; max-width: 360px; transition: all 0.4s; }
+.form-container { margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 10px; background: var(--card-bg); backdrop-filter: var(--blur); padding: 24px; border: 1px solid var(--card-border); border-radius: 28px; box-shadow: var(--shadow-drop); width: 100%; max-width: 360px; transition: all 0.4s; }
 .form-header-text { margin: 0 0 6px 0; font-size: 14px; color: var(--text-primary); font-weight: 600; text-align: center; }
-.form-container input, .form-container textarea { width: 100%; padding: 12px 16px; font-size: 13px; font-family: inherit; font-weight: 500; color: var(--text-primary); background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 14px; outline: none; transition: all 0.3s; }
+.form-container input, .form-container textarea, .input-wrapper input { width: 100%; padding: 12px 16px; font-size: 13px; font-family: inherit; font-weight: 500; color: var(--text-primary); background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 14px; outline: none; transition: all 0.3s; }
 .form-container input::placeholder, .form-container textarea::placeholder { color: var(--text-secondary); }
 .form-container input:focus, .form-container textarea:focus { border-color: var(--text-primary); transform: scale(1.02); }
 .form-container button { width: 100%; padding: 12px; font-size: 14px; font-weight: 700; color: var(--accent-text); background: var(--accent); border: none; border-radius: 14px; cursor: pointer; transition: all 0.4s; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
@@ -297,6 +281,12 @@ button { position: relative; overflow: hidden; }
 .create-link, .back-link { color: var(--text-primary); opacity: 0.5; font-size: 12px; font-weight: 500; cursor: pointer; text-decoration: underline; transition: opacity 0.3s;}
 .create-link:hover, .back-link:hover { opacity: 1; }
 .back-link { display: block; text-align: center; margin-top: 8px; }
+
+/* Password wrapper setup */
+.input-wrapper { position: relative; width: 100%; }
+.pwd-toggle-icon { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-secondary); transition: color 0.3s; z-index: 5;}
+.pwd-toggle-icon:hover { color: var(--text-primary); }
+.input-wrapper input { padding-right: 40px; }
 
 #message, #regMessage, #twoFaMessage, #secretMessage, #keyMessage { font-weight: 600; font-size: 12px; text-align: center; min-height: 16px; opacity: 0; transition: opacity 0.4s; margin-top: 4px; }
 .show { opacity: 1 !important; } .success-msg { color: #34c759; } .error-msg { color: var(--error); }
@@ -320,7 +310,7 @@ button { position: relative; overflow: hidden; }
 .infinity-path-tail { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 20 80; stroke-dashoffset: 0; animation: dash 1s linear infinite; filter: drop-shadow(0 0 4px var(--accent)); }
 @keyframes dash { to { stroke-dashoffset: -100; } }
 
-.dashboard-layout { margin: auto; display: none; width: 100%; max-width: 1100px; gap: 20px; }
+.dashboard-layout { margin: 0 auto; display: none; width: 100%; max-width: 1100px; gap: 20px; align-items: flex-start; }
 .sidebar { flex: 0 0 250px; background: var(--card-bg); backdrop-filter: var(--blur); border: 1px solid var(--card-border); border-radius: 28px; padding: 20px; display: flex; flex-direction: column; box-shadow: var(--shadow-drop); }
 .sidebar h2 { margin: 0 0 16px 0; font-size: 14px; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1px; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 6px; flex: 1; }
@@ -371,15 +361,18 @@ button { position: relative; overflow: hidden; }
 
 .scripts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; width: 100%; }
 .script-card { padding: 0; }
-.script-banner { width: 100%; height: 160px; background-size: cover; background-position: center; position: relative; }
-.script-banner::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 80px; background: linear-gradient(to bottom, transparent, var(--card-bg)); opacity: 1; }
+.script-banner { width: 100%; height: 160px; background-size: cover; background-position: center; position: relative; border-top-left-radius: 23px; border-top-right-radius: 23px; }
+.script-banner::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 80px; background: linear-gradient(to bottom, transparent, var(--card-bg)); opacity: 1; border-top-left-radius: 23px; border-top-right-radius: 23px; }
 .script-content { padding: 20px; position: relative; z-index: 2; display: flex; flex-direction: column; gap: 10px; flex: 1; }
 .script-header h3 { margin: 0; font-size: 20px; color: var(--text-primary); display: flex; flex-direction: column; gap: 4px; }
 .game-tag { font-size: 11px; font-weight: 700; opacity: 0.6; text-transform: uppercase; letter-spacing: 1px;}
 .script-desc { margin: 0; font-size: 13px; color: var(--text-secondary); line-height: 1.5; flex: 1; }
-.copy-btn { background: var(--accent); color: var(--accent-text); border: none; padding: 14px; border-radius: 16px; font-weight: 800; font-family: 'Inter', monospace; cursor: pointer; text-transform: uppercase; font-size: 13px; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: auto; transform: translateZ(30px); }
-.copy-btn:not(:disabled):hover { transform: translateZ(40px) scale(1.05); }
+.copy-btn { flex: 1; background: var(--accent); color: var(--accent-text); border: none; padding: 14px; border-radius: 16px; font-weight: 800; font-family: 'Inter', monospace; cursor: pointer; text-transform: uppercase; font-size: 13px; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 8px; transform: translateZ(30px); }
+.copy-btn:not(:disabled):hover { transform: translateZ(40px) scale(1.03); }
 .copy-btn:disabled { opacity: 0.5; cursor: not-allowed; background: var(--input-bg); color: var(--text-secondary); border: 1px solid var(--input-border); }
+.discord-icon-btn { background: #5865F2; border: none; padding: 14px; border-radius: 16px; cursor: pointer; transition: all 0.3s; display: flex; align-items: center; justify-content: center; transform: translateZ(30px); }
+.discord-icon-btn:hover { transform: translateZ(40px) scale(1.05); filter: brightness(1.2); }
+.executor-info { font-size: 11px; color: var(--text-secondary); margin-top: 12px; border-top: 1px solid var(--card-border); padding-top: 12px; white-space: pre-line; line-height: 1.4; transform: translateZ(20px); }
 
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(15px); z-index: 10000; display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: opacity 0.4s; }
 .modal-overlay.active { opacity: 1; pointer-events: auto; }
@@ -425,7 +418,7 @@ button { position: relative; overflow: hidden; }
   <div id="landingWrapper">
     <div class="landing-hero">
       <h1 data-i18n="l_title">Dive in, ride with Global Scripts</h1>
-      <p data-i18n="l_sub">Experience the next generation of script execution. Packed with power, built for stability, and designed for you. Join the elite community today.</p>
+      <p data-i18n="l_sub">Experience the next generation of script execution. Packed with power, built for stability, and designed for you.</p>
       <button class="login-to-start-btn" onclick="enterAppFromLanding()" data-i18n="l_btn">LOGIN TO START</button>
     </div>
     <div class="feature-grid">
@@ -446,7 +439,6 @@ button { position: relative; overflow: hidden; }
 
   <div class="ambient-bg"></div>
   <canvas id="bgCanvas"></canvas>
-  <div class="ocean"><div class="wave"></div><div class="wave"></div><div class="wave"></div></div>
 
   <!-- MODALS -->
   <div class="modal-overlay" id="customModalOverlay">
@@ -533,12 +525,23 @@ button { position: relative; overflow: hidden; }
     <div class="header" id="mainHeader">
       <img src="https://raw.githubusercontent.com/Rob4ik02/Global-Scripts-Development/refs/heads/main/Icon.png" alt="" />
       <h1>Global Script's</h1>
+      
+      <!-- БОЛЬШОЙ АНИМИРОВАННЫЙ ГЛАЗ (АВТОРИЗАЦИЯ) -->
+      <div id="bigEyeContainer" class="big-eye-container">
+          <svg class="big-eye-svg" viewBox="0 0 100 50">
+              <path d="M 5 25 Q 50 -10 95 25 Q 50 60 5 25" fill="var(--input-bg)" stroke="var(--card-border)" stroke-width="2"/>
+              <circle id="bigEyePupil" cx="50" cy="25" r="10" fill="var(--text-primary)"/>
+          </svg>
+      </div>
     </div>
 
     <!-- ФОРМЫ АВТОРИЗАЦИИ -->
     <div class="form-container" id="authForm" style="{{ 'display:none;' if current_user else 'display:flex;' }}">
       <input type="text" id="login" data-i18n-ph="login_ph" placeholder="Login" autocomplete="off" />
-      <input type="password" id="password" data-i18n-ph="pass_ph" placeholder="Password" />
+      <div class="input-wrapper">
+          <input type="password" id="password" data-i18n-ph="pass_ph" placeholder="Password" />
+          <i data-lucide="eye-off" class="pwd-toggle-icon" id="toggleLoginPwd"></i>
+      </div>
       <button id="signUpBtn" data-i18n="auth_btn">AUTHORIZE</button>
       <div id="message"></div>
       <div class="create-link-wrapper show" id="createAccountWrapper">
@@ -547,7 +550,10 @@ button { position: relative; overflow: hidden; }
     </div>
     <div class="form-container" id="secretForm" style="display:none;">
       <p class="form-header-text" data-i18n="dev_auth">Developer Authentication</p>
-      <input type="password" id="devSecretCode" data-i18n-ph="secret_ph" placeholder="Secret Word" autocomplete="off" />
+      <div class="input-wrapper">
+          <input type="password" id="devSecretCode" data-i18n-ph="secret_ph" placeholder="Secret Word" autocomplete="off" />
+          <i data-lucide="eye-off" class="pwd-toggle-icon" id="toggleSecretPwd"></i>
+      </div>
       <button id="verifySecretBtn" data-i18n="unlock_btn">UNLOCK MAINFRAME</button>
       <div id="secretMessage"></div>
       <div class="back-link" id="cancelSecretLink" data-i18n="cancel">Cancel</div>
@@ -562,9 +568,15 @@ button { position: relative; overflow: hidden; }
     <div class="form-container" id="regForm" style="display:none;">
       <p class="form-header-text" data-i18n="reg_desc">Describe yourself for the account.</p>
       <input type="text" id="regLogin" data-i18n-ph="login_ph" placeholder="Login" autocomplete="off" />
-      <input type="password" id="regPassword" data-i18n-ph="pass_ph" placeholder="Password" />
+      <div class="input-wrapper">
+          <input type="password" id="regPassword" data-i18n-ph="pass_ph" placeholder="Password" />
+          <i data-lucide="eye-off" class="pwd-toggle-icon" id="toggleRegPwd"></i>
+      </div>
       <input type="text" id="regEmail" class="email-input" data-i18n-ph="email_ph" placeholder="Enter your email" autocomplete="off" />
-      <input type="password" id="regSecret" data-i18n-ph="reg_sec_ph" placeholder="Secret word" autocomplete="off" />
+      <div class="input-wrapper">
+          <input type="password" id="regSecret" data-i18n-ph="reg_sec_ph" placeholder="Secret word" autocomplete="off" />
+          <i data-lucide="eye-off" class="pwd-toggle-icon" id="toggleRegSec"></i>
+      </div>
       <input type="text" id="regSource" data-i18n-ph="reg_src_ph" placeholder="How did you hear about us?" autocomplete="off" />
       <div style="display: flex; gap: 10px; width: 100%; margin-top: 4px;">
           <div id="captchaBox" class="captcha-box">? + ?</div>
@@ -698,6 +710,18 @@ button { position: relative; overflow: hidden; }
         <div class="tab-content" id="tab-developers">
           <h2 data-i18n="d_tit"><i data-lucide="server" style="width:28px; height:28px;"></i> Developers</h2>
           <div id="devAdminView" style="display: flex; flex-direction: column; gap: 20px;">
+             
+             <!-- БЭКАПЫ БД -->
+             <div class="dashboard-card">
+                 <h4 style="margin: 0 0 10px 0; color: var(--text-primary); display:flex; align-items:center; gap:8px;"><i data-lucide="database" style="width:18px;height:18px;"></i> <span data-i18n="m_db">Database Management</span></h4>
+                 <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;" data-i18n="m_db_d">Download full system backup or restore from a previous state.</p>
+                 <div style="display:flex; gap:10px;">
+                     <button class="action-btn" onclick="window.location.href='/admin/backup_db'" style="flex:1;"><i data-lucide="download" style="width:16px;height:16px;"></i> Download Backup</button>
+                     <input type="file" id="dbUploadInput" style="display:none" accept=".db,.sqlite,.sqlite3">
+                     <button class="action-btn danger-btn" onclick="document.getElementById('dbUploadInput').click()" style="flex:1;"><i data-lucide="upload" style="width:16px;height:16px;"></i> Restore Backup</button>
+                 </div>
+             </div>
+
              <div class="dashboard-card">
                  <h4 style="margin: 0 0 10px 0; color: var(--text-primary); display:flex; align-items:center; gap:8px;"><i data-lucide="file-code" style="width:18px;height:18px;"></i> Script Management</h4>
                  <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
@@ -706,11 +730,15 @@ button { position: relative; overflow: hidden; }
                          <input type="text" id="devScriptTitle" class="dev-select" placeholder="Script Title" style="flex:1;">
                          <input type="text" id="devScriptGame" class="dev-select" placeholder="Game Name" style="flex:1;">
                      </div>
-                     <input type="text" id="devScriptBanner" class="dev-select" placeholder="Banner Image URL">
+                     <div style="display:flex; gap:10px;">
+                         <input type="text" id="devScriptBanner" class="dev-select" placeholder="Banner Image URL" style="flex:2;">
+                         <input type="text" id="devScriptDiscord" class="dev-select" placeholder="Discord Link (Optional)" style="flex:1;">
+                     </div>
                      <div style="display:flex; gap:10px; align-items:center;">
                          <span style="font-size:12px; color:var(--text-secondary); white-space:nowrap;">Release Date:</span>
                          <input type="datetime-local" id="devScriptDate" class="dev-select" style="flex:1;">
                      </div>
+                     <textarea id="devScriptExecutors" class="dev-select" placeholder="Executors Info (e.g. Delta - Working! | sUNC - 100%)" rows="2"></textarea>
                      <input type="text" id="devScriptCode" class="dev-select" placeholder="Lua Code (loadstring...)">
                      <textarea id="devScriptDesc" class="dev-select" placeholder="Description..." rows="2"></textarea>
                      <div style="display:flex; gap:10px;">
@@ -788,97 +816,23 @@ button { position: relative; overflow: hidden; }
   </div>
 
 <script>
-  // АНТИ-КРАЖА СКРИПТОВ (Отключение консоли и выделения)
-  document.addEventListener('contextmenu', event => event.preventDefault());
-  document.addEventListener('keydown', (e) => {
-      if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key)) || (e.ctrlKey && e.key === 'U')) {
-          e.preventDefault();
-      }
-  });
+  // 1. ИНЪЕКЦИИ PYTHON (Определяются СТРОГО до их использования)
+  const IS_USER_LOGGED_IN = {{ 'true' if current_user else 'false' }};
+  const SHOW_FREEZE = {{ show_freeze }};
+  const SHOW_MAINTENANCE = {{ show_maintenance }};
 
-  // ЗАГРУЗКА ИКОНОК
-  function updateIcons() {
-      if (typeof lucide !== 'undefined') { lucide.createIcons(); }
-  }
-
-  function initTiltEffect() {
-      const cards = document.querySelectorAll('.feature-box:not(.tilt-applied), .script-card:not(.tilt-applied), .plan-card:not(.tilt-applied), .dashboard-card:not(.tilt-applied)');
-      cards.forEach(card => {
-          card.classList.add('tilt-applied');
-          card.addEventListener('mousemove', e => {
-              const rect = card.getBoundingClientRect();
-              const x = e.clientX - rect.left;
-              const y = e.clientY - rect.top;
-              const centerX = rect.width / 2;
-              const centerY = rect.height / 2;
-              
-              const isDashboard = card.closest('#dashboardLayout') !== null;
-              const maxTilt = isDashboard ? 1.5 : 3; 
-
-              const rotateX = ((y - centerY) / centerY) * -maxTilt;
-              const rotateY = ((x - centerX) / centerX) * maxTilt;
-              
-              card.style.transform = `perspective(1200px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.01, 1.01, 1.01)`;
-              card.style.transition = 'transform 0.2s ease-out';
-              card.style.zIndex = '10';
-          });
-          card.addEventListener('mouseleave', () => {
-              card.style.transform = `perspective(1200px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`;
-              card.style.transition = 'transform 0.6s ease';
-              card.style.zIndex = '1';
-          });
-      });
-  }
-
-  document.addEventListener('mousedown', function(e) {
-      const btn = e.target.closest('button');
-      if (!btn) return;
-      const rect = btn.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      for (let i = 0; i < 12; i++) {
-          const particle = document.createElement('span');
-          particle.className = 'btn-particle';
-          const angle = Math.random() * Math.PI * 2;
-          const velocity = 20 + Math.random() * 40; 
-          const tx = Math.cos(angle) * velocity;
-          const ty = Math.sin(angle) * velocity;
-
-          particle.style.left = x + 'px';
-          particle.style.top = y + 'px';
-          particle.style.setProperty('--tx', tx + 'px');
-          particle.style.setProperty('--ty', ty + 'px');
-
-          btn.appendChild(particle);
-          setTimeout(() => particle.remove(), 600);
-      }
-  });
-
+  // 2. ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+  let currentLang = 'en';
+  let confirmActionCallback = null;
+  let activeTicketId = null;
+  let showAllTix = false;
   let globalWarpSpeedY = 0;
+  let isSystemLoading = false;
+  let isErrorState = false;
+  let userScriptsData = {};
+  let adminScriptsData = {};
 
-  function enterAppFromLanding() {
-      const landing = document.getElementById('landingWrapper');
-      landing.style.opacity = '0';
-      
-      setTimeout(() => {
-          landing.style.display = 'none';
-          
-          globalWarpSpeedY = 25; 
-
-          setTimeout(() => {
-              const appContent = document.getElementById('appMainWrapper');
-              appContent.style.display = 'flex';
-              updateIcons();
-              initTiltEffect();
-          }, 600);
-          
-      }, 500);
-  }
-
-  window.userScriptsData = {};
-  window.adminScriptsData = {};
-
+  // 3. i18n
   const i18n = {
     en: { 
         theme_btn: "Light Mode", logout: "Logout", auth_btn: "AUTHORIZE", no_acc: "Don't have an account? Create it!", 
@@ -903,16 +857,12 @@ button { position: relative; overflow: hidden; }
         prompt_msg: "Message for user:", r_hist: "Receipts History", r_hist_btn: "Receipts", t_reason_ph: "Reason for support...", 
         t_norm: "Normal Speed", t_fast: "Fast Response", t_send: "Send Support Request", t_suc_tit: "Request Created!", 
         t_suc_desc: "Ticket submitted to developers.", t_msg_ph: "Type message...", t_reply: "Send", t_close: "Close Ticket", 
-        t_show_all: "Show All",
-        l_title: "Dive in, ride with Global Scripts", 
-        l_sub: "Experience the next generation of script execution. Packed with power, built for stability, and designed for you. Join the elite community today.", 
-        l_btn: "LOGIN TO START", 
-        f_fast: "Lightning Fast", 
-        f_fast_d: "Blazing fast script execution with virtually zero delay and optimized memory usage.", 
-        f_crash: "Crash Resistant", 
-        f_crash_d: "Tested interface and advanced stability protocols built by veteran developers.", 
-        f_cloud: "Cloud Hub", 
-        f_cloud_d: "Instant access to a massive verified database of scripts for all popular games."
+        t_show_all: "Show All", l_title: "Dive in, ride with Global Scripts", 
+        l_sub: "Experience the next generation of script execution. Packed with power, built for stability, and designed for you.", 
+        l_btn: "LOGIN TO START", f_fast: "Lightning Fast", f_fast_d: "Blazing fast script execution with virtually zero delay.", 
+        f_crash: "Crash Resistant", f_crash_d: "Tested interface and advanced stability protocols.", 
+        f_cloud: "Cloud Hub", f_cloud_d: "Instant access to a massive verified database of scripts.",
+        m_db: "Database Management", m_db_d: "Download full system backup or restore.", s_no_scripts: "No scripts available at the moment.", s_refresh: "Refresh Database"
     },
     ru: { 
         theme_btn: "Светлая тема", logout: "Выйти", auth_btn: "АВТОРИЗАЦИЯ", no_acc: "Нет аккаунта? Создайте!", 
@@ -937,14 +887,11 @@ button { position: relative; overflow: hidden; }
         t_norm: "Обычно", t_fast: "Быстро", t_send: "Отправить запрос", t_suc_tit: "Успешно!", t_suc_desc: "Запрос отправлен разработчикам.", 
         t_msg_ph: "Сообщение...", t_reply: "Отправить", t_close: "Закрыть тикет", t_show_all: "Открыть все",
         l_title: "Погружайся, лети с Global Scripts", 
-        l_sub: "Ощути новое поколение запуска скриптов. Мощно, стабильно и сделано специально для тебя. Присоединяйся к элитному комьюнити уже сегодня.", 
-        l_btn: "ВОЙТИ ДЛЯ НАЧАЛА", 
-        f_fast: "Молниеносная Скорость", 
-        f_fast_d: "Сверхбыстрый запуск скриптов практически без задержек и оптимизированное потребление памяти.", 
-        f_crash: "Защита от крашей", 
-        f_crash_d: "Проверенный интерфейс и передовые протоколы стабильности от разработчиков-ветеранов.", 
-        f_cloud: "Облачный Хаб", 
-        f_cloud_d: "Мгновенный доступ к огромной проверенной базе скриптов для всех популярных режимов."
+        l_sub: "Ощути новое поколение запуска скриптов. Мощно, стабильно и сделано специально для тебя.", 
+        l_btn: "ВОЙТИ ДЛЯ НАЧАЛА", f_fast: "Молниеносная Скорость", f_fast_d: "Сверхбыстрый запуск скриптов.", 
+        f_crash: "Защита от крашей", f_crash_d: "Проверенный интерфейс и передовые протоколы стабильности.", 
+        f_cloud: "Облачный Хаб", f_cloud_d: "Мгновенный доступ к огромной базе скриптов.",
+        m_db: "Управление БД", m_db_d: "Скачай резервную копию или восстанови систему.", s_no_scripts: "На данный момент скриптов нет.", s_refresh: "Обновить Базу"
     },
     ja: { 
         theme_btn: "ライト", logout: "ログアウト", auth_btn: "承認", no_acc: "作成する", dev_auth: "開発者認証", dev_desc: "秘密コード", 
@@ -964,15 +911,11 @@ button { position: relative; overflow: hidden; }
         prompt_msg: "メッセージ：", r_hist: "レシート", r_hist_btn: "レシート", t_reason_ph: "理由...", t_norm: "通常", 
         t_fast: "早い", t_send: "送信", t_suc_tit: "成功！", t_suc_desc: "送信しました。", t_msg_ph: "メッセージ...", 
         t_reply: "送信", t_close: "閉じる", t_show_all: "すべて表示",
-        l_title: "Global Scriptsで波に乗れ", 
-        l_sub: "次世代のスクリプト実行を体験しよう。強力で安定し、あなたのために設計されています。今すぐエリートコミュニティに参加しよう。", 
-        l_btn: "ログインして開始", 
-        f_fast: "超高速", 
-        f_fast_d: "遅延がほとんどなく、メモリ使用量を最適化した超高速なスクリプト実行。", 
-        f_crash: "クラッシュ耐性", 
-        f_crash_d: "熟練の開発者によって構築された、テスト済みのインターフェースと高度な安定性プロトコル。", 
-        f_cloud: "クラウドハブ", 
-        f_cloud_d: "すべての人気ゲーム向けの検証済みスクリプトの巨大なデータベースへの即時アクセス。"
+        l_title: "Global Scriptsで波に乗れ", l_sub: "次世代のスクリプト実行を体験しよう。", l_btn: "ログインして開始", 
+        f_fast: "超高速", f_fast_d: "遅延がほとんどなく、メモリ使用量を最適化した超高速なスクリプト実行。", 
+        f_crash: "クラッシュ耐性", f_crash_d: "テスト済みのインターフェースと高度な安定性プロトコル。", 
+        f_cloud: "クラウドハブ", f_cloud_d: "検証済みスクリプトへの即時アクセス。",
+        m_db: "データベース管理", m_db_d: "バックアップをダウンロードまたは復元します。", s_no_scripts: "現在スクリプトはありません。", s_refresh: "更新する"
     },
     pt: { 
         theme_btn: "Claro", logout: "Sair", auth_btn: "AUTORIZAR", no_acc: "Criar conta", dev_auth: "Dev Auth", dev_desc: "Código secreto.", 
@@ -992,20 +935,17 @@ button { position: relative; overflow: hidden; }
         r_dev: "Dev: ", r_btn: "OK", prompt_msg: "Mensagem:", r_hist: "Recibos", r_hist_btn: "Recibos", t_reason_ph: "Motivo...", 
         t_norm: "Normal", t_fast: "Rápido", t_send: "Enviar Pedido", t_suc_tit: "Sucesso!", t_suc_desc: "Enviado.", 
         t_msg_ph: "Mensagem...", t_reply: "Enviar", t_close: "Fechar", t_show_all: "Ver todos",
-        l_title: "Mergulhe, voe com a Global Scripts", 
-        l_sub: "Experimente a próxima geração de execução de scripts. Potente, estável e feito para você. Junte-se à comunidade de elite hoje.", 
-        l_btn: "ENTRAR PARA COMEÇAR", 
-        f_fast: "Super Rápido", 
-        f_fast_d: "Execução de script extremamente rápida com praticamente zero de atraso e uso otimizado de memória.", 
-        f_crash: "Resistente a Falhas", 
-        f_crash_d: "Interface testada e protocolos avançados de estabilidade construídos por desenvolvedores veteranos.", 
-        f_cloud: "Hub em Nuvem", 
-        f_cloud_d: "Acesso instantâneo a um enorme banco de dados verificado de scripts para todos os jogos populares."
+        l_title: "Mergulhe, voe com a Global Scripts", l_sub: "Experimente a próxima geração de execução de scripts.", 
+        l_btn: "ENTRAR PARA COMEÇAR", f_fast: "Super Rápido", f_fast_d: "Execução de script extremamente rápida com zero atraso.", 
+        f_crash: "Resistente a Falhas", f_crash_d: "Interface testada e protocolos avançados de estabilidade.", 
+        f_cloud: "Hub em Nuvem", f_cloud_d: "Acesso instantâneo a um enorme banco de dados verificado.",
+        m_db: "Gestão de Base de Dados", m_db_d: "Baixar backup ou restaurar.", s_no_scripts: "Nenhum script disponível no momento.", s_refresh: "Atualizar"
     }
   };
 
-  let currentLang = 'en';
-
+  // 4. ВСЕ ГЛОБАЛЬНЫЕ ФУНКЦИИ
+  function updateIcons() { if (typeof lucide !== 'undefined') lucide.createIcons(); }
+  
   function setLang(lang) {
     currentLang = lang; localStorage.setItem('lang', lang);
     const map = { en: "🌎 EN", ru: "🇷🇺 RU", ja: "🇯🇵 JA", pt: "🇧🇷 PT" };
@@ -1015,7 +955,6 @@ button { position: relative; overflow: hidden; }
     document.querySelectorAll('[data-i18n-ph]').forEach(el => { if(i18n[lang][el.getAttribute('data-i18n-ph')]) el.placeholder = i18n[lang][el.getAttribute('data-i18n-ph')]; });
   }
 
-  let confirmActionCallback = null;
   function showConfirm(title, message, confirmText, isDanger, callback, hideCancel = false, isPrompt = false) {
       document.getElementById('modalTitle').innerText = title; document.getElementById('modalMessage').innerText = message;
       const confirmBtn = document.getElementById('modalConfirmBtn'); confirmBtn.innerText = confirmText; confirmBtn.className = isDanger ? 'modal-btn modal-btn-danger' : 'modal-btn modal-btn-confirm';
@@ -1024,59 +963,24 @@ button { position: relative; overflow: hidden; }
       if(isPrompt) { promptInput.style.display = 'block'; promptInput.value = ''; } else { promptInput.style.display = 'none'; }
       confirmActionCallback = callback; document.getElementById('customModalOverlay').classList.add('active');
   }
+  
   function closeConfirm() { document.getElementById('customModalOverlay').classList.remove('active'); confirmActionCallback = null; }
-  document.getElementById('modalCancelBtn').addEventListener('click', closeConfirm);
-  document.getElementById('modalConfirmBtn').addEventListener('click', () => { const val = document.getElementById('modalInput').value.trim(); if(confirmActionCallback) confirmActionCallback(val); closeConfirm(); });
-
   function showMessage(elId, txt, succ) { const el=document.getElementById(elId); el.innerText=txt; el.className=succ?'success-msg show':'error-msg show'; }
   function hideMessage(elId) { document.getElementById(elId).classList.remove('show'); }
+  function showLoadingScreen() { document.getElementById('loaderScreen').style.display = 'flex'; isSystemLoading = true; }
+  function hideLoadingScreen() { document.getElementById('loaderScreen').style.display = 'none'; isSystemLoading = false; }
+  function triggerErrorAnimation(formEl) { formEl.classList.remove('shake-error'); setTimeout(() => formEl.classList.add('shake-error'), 10); setTimeout(() => formEl.classList.remove('shake-error'), 400); isErrorState = true; setTimeout(() => { isErrorState = false; }, 600); }
 
-  function openReceipts() {
-      fetch('/api/get_receipts').then(res => res.json()).then(data => {
-          const cont = document.getElementById('receiptsContainer');
-          cont.innerHTML = '';
-          if(data.receipts.length === 0) { cont.innerHTML = '<p>No receipts found.</p>'; }
-          else {
-              data.receipts.forEach(r => {
-                  cont.innerHTML += `<div style="background:var(--input-bg); border:1px solid var(--card-border); border-radius:12px; padding:10px; margin-bottom:8px;"><b>TxID:</b> ${r.tx_id}<br><b>Plan:</b> ${r.plan}<br><b>Amount:</b> ${r.amount} RUB<br><b>Date:</b> ${r.date_str}</div>`;
-              });
-          }
-          document.getElementById('receiptsModalOverlay').classList.add('active');
-      });
+  function switchTab(targetId) {
+    const sidebarBtns = document.querySelectorAll('.sidebar-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    sidebarBtns.forEach(b => b.classList.remove('active')); tabContents.forEach(t => t.classList.remove('active'));
+    sidebarBtns.forEach(b => { if(b.getAttribute('data-target') === targetId) b.classList.add('active'); }); document.getElementById(targetId).classList.add('active');
+    if(targetId === 'tab-faq' && !document.getElementById('userTicketChatCard').style.display.includes('none')) { checkUserTicketState(); }
+    if(targetId === 'tab-scripts') { loadUserScripts(); }
+    initTiltEffect(); 
   }
-
-  function processPayment(planName) {
-      showConfirm('Purchase Plan', `Proceed to secure payment for ${planName}?`, 'Pay Now', false, () => {
-          document.getElementById('loaderDynamicText').innerText = "Connecting to Payment Gateway...";
-          document.getElementById('loaderScreen').style.display = 'flex';
-          fetch('/create_payment', { 
-              method: 'POST', 
-              headers: { 'Content-Type': 'application/json' }, 
-              body: JSON.stringify({ plan: planName }) 
-          })
-          .then(res => res.json())
-          .then(data => {
-              if(data.success) {
-                  window.location.href = data.payment_url;
-              } else {
-                  document.getElementById('loaderScreen').style.display = 'none';
-                  showConfirm('Payment Error', data.message || 'Could not connect to gateway', 'OK', false, null, true);
-              }
-          })
-          .catch(err => {
-              document.getElementById('loaderScreen').style.display = 'none';
-              showConfirm('Network Error', 'Something went wrong.', 'OK', false, null, true);
-          });
-      });
-  }
-
-  function generateKey(forceOverride) {
-      fetch('/generate_key', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force: forceOverride }) }).then(res => res.json()).then(data => {
-          if(data.success) { document.getElementById('generatedKeyDisplay').innerText = data.key; document.getElementById('generatedKeyDisplay').style.display = 'block'; showMessage('keyMessage', 'Key generated!', true); } 
-          else { showConfirm('Cooldown Active', data.message, 'OK', false, null, true); }
-      });
-  }
-
+  
   function switchPlanSubTab(tab) {
     document.getElementById('btnBuyPlan').classList.remove('active'); document.getElementById('btnMyPlan').classList.remove('active');
     document.getElementById('planBuySection').style.display = 'none'; document.getElementById('planMySection').style.display = 'none';
@@ -1085,19 +989,171 @@ button { position: relative; overflow: hidden; }
     initTiltEffect();
   }
 
-  let activeTicketId = null;
-  let showAllTix = false;
+  function initTiltEffect() {
+      const cards = document.querySelectorAll('.feature-box:not(.tilt-applied), .script-card:not(.tilt-applied), .plan-card:not(.tilt-applied), .dashboard-card:not(.tilt-applied)');
+      cards.forEach(card => {
+          card.classList.add('tilt-applied');
+          card.addEventListener('mousemove', e => {
+              const rect = card.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              const y = e.clientY - rect.top;
+              const centerX = rect.width / 2;
+              const centerY = rect.height / 2;
+              const isDashboard = card.closest('#dashboardLayout') !== null;
+              const maxTilt = isDashboard ? 1.5 : 3; 
+              const rotateX = ((y - centerY) / centerY) * -maxTilt;
+              const rotateY = ((x - centerX) / centerX) * maxTilt;
+              card.style.transform = `perspective(1200px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.01, 1.01, 1.01)`;
+              card.style.transition = 'transform 0.1s ease-out'; // Мягкий отклик
+              card.style.zIndex = '10';
+          });
+          card.addEventListener('mouseleave', () => {
+              card.style.transform = `perspective(1200px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`;
+              card.style.transition = 'transform 0.6s ease';
+              card.style.zIndex = '1';
+          });
+      });
+  }
+
+  function enterAppFromLanding() {
+      const landing = document.getElementById('landingWrapper');
+      landing.style.opacity = '0';
+      setTimeout(() => {
+          landing.style.display = 'none';
+          globalWarpSpeedY = 25; // Ускорение частиц
+          setTimeout(() => {
+              const appContent = document.getElementById('appMainWrapper');
+              appContent.style.display = 'flex';
+              updateIcons();
+              initTiltEffect();
+          }, 600);
+      }, 500);
+  }
+
+  function loadDashboard() {
+      document.getElementById('mainHeader').style.display = 'none'; document.getElementById('dashboardLayout').style.display = 'flex';
+      fetch('/get_user_info').then(res => res.json()).then(data => {
+          if(data.success) {
+              if(data.is_frozen === 'Yes') { window.location.reload(); }
+              if(data.pending_reward && data.pending_reward.type) {
+                  const rType = data.pending_reward.type; const rVal = data.pending_reward.value; const rMsg = data.pending_reward.msg;
+                  let valText = ""; if (rType === "plan") valText = "PLAN: " + rVal; if (rType === "days") valText = "+7 Days";
+                  document.getElementById('rewardValue').innerText = valText; document.getElementById('rewardMessage').innerText = rMsg; document.getElementById('rewardScreen').style.display = 'flex';
+              }
+              if(data.active_key) { document.getElementById('generatedKeyDisplay').innerText = data.active_key; document.getElementById('generatedKeyDisplay').style.display = 'block'; }
+              
+              const greetings = ["Welcome back", "Glad to see you", "Hello", "Ready for action", "Good to have you"];
+              const randGreet = greetings[Math.floor(Math.random() * greetings.length)];
+              document.getElementById('planGreeting').innerText = `${randGreet}, ${data.login}!`;
+
+              document.getElementById('userDisplay').innerHTML = `<i data-lucide="user" style="width:14px; height:14px;"></i> <span id="userLoginText">${data.login}</span>`;
+              document.getElementById('profileLogin').innerText = data.login; document.getElementById('profilePlan').innerText = data.plan; document.getElementById('profileRegDate').innerText = data.reg_date; document.getElementById('profileDevApproved').innerText = data.dev_approved; document.getElementById('planCurrentStatus').innerText = "Your current plan: " + data.plan + " - " + data.plan_days + " Days";
+              
+              loadUserScripts(); 
+              loadAdminPanel(data.dev_approved); setInterval(checkUserTicketState, 5000); checkUserTicketState();
+              updateIcons();
+          }
+      });
+  }
+
+  function loadUserScripts() {
+      fetch('/api/get_scripts').then(res=>res.json()).then(data=>{
+          const container = document.getElementById('userScriptsContainer');
+          container.innerHTML = '';
+          if(data.scripts.length === 0) {
+              container.innerHTML = `
+              <div style="text-align:center; padding: 40px; background: var(--input-bg); border-radius: 20px; border: 1px solid var(--input-border); width: 100%;">
+                  <i data-lucide="file-x" style="width:48px;height:48px; color:var(--text-secondary); margin-bottom: 16px;"></i>
+                  <p data-i18n="s_no_scripts" style="color:var(--text-secondary); margin-bottom: 16px;">No scripts available at the moment.</p>
+                  <button class="action-btn" onclick="loadUserScripts()" style="margin: auto;" data-i18n="s_refresh"><i data-lucide="refresh-cw" style="width:16px;height:16px;"></i> Refresh Database</button>
+              </div>`;
+              setLang(currentLang); updateIcons(); return;
+          }
+          let now = new Date().getTime(); userScriptsData = {}; 
+          data.scripts.forEach(s => {
+              let releaseTime = new Date(s.release_date).getTime();
+              let isLocked = releaseTime > now;
+              userScriptsData[s.id] = s.script_code;
+              let btnHtml = isLocked ? `<button class="copy-btn" disabled><i data-lucide="lock" style="width:16px;height:16px;"></i> Unlocks: ${new Date(s.release_date).toLocaleString()}</button>` : `<button class="copy-btn" onclick="copyDynamicScript(this, ${s.id})" data-i18n="s_copy"><i data-lucide="copy" style="width:16px;height:16px;"></i> COPY LUA SCRIPT</button>`;
+              let discBtn = s.script_discord ? `<button class="discord-icon-btn" title="Discord" onclick="window.open('${s.script_discord}', '_blank')"><i data-lucide="message-square" style="width:18px;height:18px;color:#fff;"></i></button>` : '';
+              let buttonsRow = `<div style="display:flex; gap:10px; margin-top: auto;">${btnHtml}${discBtn}</div>`;
+              let safeExecutors = s.executors_info ? s.executors_info.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
+              let execInfoHtml = safeExecutors ? `<div class="executor-info">${safeExecutors}</div>` : '';
+              container.innerHTML += `
+              <div class="script-card">
+                <div class="script-banner" style="background-image: url('${s.banner_url}');"></div>
+                <div class="script-content">
+                  <div class="script-header">
+                      <h3>${s.title}</h3>
+                      <span class="game-tag">for game: ${s.game}</span>
+                  </div>
+                  <p class="script-desc">${s.description}</p>
+                  ${buttonsRow}
+                  ${execInfoHtml}
+                </div>
+              </div>`;
+          });
+          updateIcons(); initTiltEffect();
+      });
+  }
+
+  function copyDynamicScript(btn, id) {
+    const finalCode = userScriptsData[id];
+    if (!finalCode) return;
+    navigator.clipboard.writeText(finalCode).then(() => {
+      const originalHtml = btn.innerHTML; 
+      btn.innerHTML = '<i data-lucide="check" style="width:16px;height:16px;"></i> Copied!'; 
+      btn.style.backgroundColor = 'var(--success)'; btn.style.color = '#fff';
+      updateIcons(); setTimeout(() => { btn.innerHTML = originalHtml; btn.style.backgroundColor = ''; btn.style.color = ''; updateIcons(); }, 2000);
+    });
+  }
+
+  function openReceipts() {
+      fetch('/api/get_receipts').then(res => res.json()).then(data => {
+          const cont = document.getElementById('receiptsContainer');
+          cont.innerHTML = '';
+          if(data.receipts.length === 0) { cont.innerHTML = '<p>No receipts found.</p>'; }
+          else { data.receipts.forEach(r => { cont.innerHTML += `<div style="background:var(--input-bg); border:1px solid var(--card-border); border-radius:12px; padding:10px; margin-bottom:8px;"><b>TxID:</b> ${r.tx_id}<br><b>Plan:</b> ${r.plan}<br><b>Amount:</b> ${r.amount} RUB<br><b>Date:</b> ${r.date_str}</div>`; }); }
+          document.getElementById('receiptsModalOverlay').classList.add('active');
+      });
+  }
+  function processPayment(planName) {
+      showConfirm('Purchase Plan', `Proceed to secure payment for ${planName}?`, 'Pay Now', false, () => {
+          document.getElementById('loaderDynamicText').innerText = "Connecting to Payment Gateway..."; showLoadingScreen();
+          fetch('/create_payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan: planName }) }).then(res => res.json()).then(data => { if(data.success) { window.location.href = data.payment_url; } else { hideLoadingScreen(); showConfirm('Payment Error', data.message || 'Could not connect to gateway', 'OK', false, null, true); } }).catch(err => { hideLoadingScreen(); showConfirm('Network Error', 'Something went wrong.', 'OK', false, null, true); });
+      });
+  }
+  function generateKey(forceOverride) {
+      fetch('/generate_key', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force: forceOverride }) }).then(res => res.json()).then(data => {
+          if(data.success) { document.getElementById('generatedKeyDisplay').innerText = data.key; document.getElementById('generatedKeyDisplay').style.display = 'block'; showMessage('keyMessage', 'Key generated!', true); } 
+          else { showConfirm('Cooldown Active', data.message, 'OK', false, null, true); }
+      });
+  }
+  function requestRestartPlan() { showConfirm('Restart Plan', 'Are you sure you want to restart your current plan?', 'Restart', false, () => { fetch('/restart_plan', { method: 'POST' }).then(res => res.json()).then(data => { if(data.success) window.location.reload(); }); }); }
+  function requestDeleteAccount() { showConfirm('Delete Account', 'WARNING: This will permanently delete your account!', 'DELETE', true, () => { fetch('/delete_account', { method: 'POST' }).then(res => res.json()).then(data => { if(data.success) window.location.reload(); }); }); }
+  function closeRewardScreen() { fetch('/api/clear_reward', { method: 'POST' }).then(() => { document.getElementById('rewardScreen').style.display = 'none'; }); }
+
+  function submitUserTicket() {
+      const reason = document.getElementById('uTicketReason').value.trim(); const prio = document.getElementById('uTicketPriority').value;
+      if(!reason) return;
+      fetch('/api/submit_ticket', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason, priority: prio }) }).then(res=>res.json()).then(data=>{ if(data.success) { document.getElementById('ticketSuccessOverlay').style.display='flex'; checkUserTicketState(); } });
+  }
+  function checkUserTicketState() {
+      fetch('/api/get_user_ticket').then(res=>res.json()).then(data=>{
+          if(data.ticket) {
+              document.getElementById('userTicketFormCard').style.display = 'none'; document.getElementById('userTicketChatCard').style.display = 'flex'; document.getElementById('uChatBadge').innerText = data.ticket.status; activeTicketId = data.ticket.id;
+              const box = document.getElementById('uChatBox'); box.innerHTML = '';
+              data.messages.forEach(m => { const cl = m.sender === 'user' ? 'chat-msg user' : 'chat-msg dev'; box.innerHTML += `<div class="${cl}"><b>${m.sender}:</b> ${m.message}</div>`; }); box.scrollTop = box.scrollHeight;
+              if(data.ticket.status === 'closed') { document.getElementById('uChatInputs').style.display = 'none'; document.getElementById('uChatBadge').innerText = "Closed ✔️"; } else { document.getElementById('uChatInputs').style.display = 'flex'; }
+          } else { document.getElementById('userTicketFormCard').style.display = 'block'; document.getElementById('userTicketChatCard').style.display = 'none'; }
+      });
+  }
 
   function loadAdminPanel(devApproved) {
      if (devApproved !== 'Yes') return;
-     document.getElementById('devForceKeyBtn').style.display = 'block';
-     document.getElementById('navDevBtn').style.display = 'flex';
-
-     document.getElementById('devAdminView').style.display = 'flex';
-     refreshAdminData(); setInterval(refreshConsoleLogs, 3000);
-     setInterval(pollAdminTickets, 5000);
+     document.getElementById('devForceKeyBtn').style.display = 'block'; document.getElementById('navDevBtn').style.display = 'flex'; document.getElementById('devAdminView').style.display = 'flex';
+     refreshAdminData(); setInterval(refreshConsoleLogs, 3000); setInterval(pollAdminTickets, 5000);
   }
-  
   function refreshAdminData() {
      fetch('/admin/get_users').then(res => res.json()).then(data => {
         if(data.success) {
@@ -1108,392 +1164,165 @@ button { position: relative; overflow: hidden; }
               const freezeText = u.is_frozen === 'Yes' ? 'Unfreeze' : 'Freeze';
               const freezeClass = u.is_frozen === 'Yes' ? 'dev-btn-sm dev-btn-danger' : 'dev-btn-sm dev-btn-freeze';
               tbody.innerHTML += `<tr><td><b>${u.login}</b></td><td>${u.plan}</td><td>${u.plan_days} d</td><td><select class="dev-select" onchange="promptAdminChangePlan('${u.login}', this.value)"><option value="" selected disabled>Select plan</option><option value="Starter Plan">Starter</option><option value="Professional Plan">Professional</option><option value="Extreme Plan">Extreme</option></select></td><td><div style="display:flex; gap:8px;"><button class="dev-btn-sm" onclick="promptAdminAddDays('${u.login}')">+7 Days</button><button class="${freezeClass}" onclick="adminToggleFreeze('${u.login}')">${freezeText}</button><button class="dev-btn-sm dev-btn-danger" onclick="requestAdminDeleteUser('${u.login}')">Delete</button></div></td></tr>`;
-           });
-           updateIcons();
+           }); updateIcons();
         }
-     }).catch(e => console.error(e));
-     pollAdminTickets();
-     loadAdminScripts(); 
+     }).catch(e => console.error(e)); pollAdminTickets(); loadAdminScripts(); 
   }
-
-  function loadUserScripts() {
-      fetch('/api/get_scripts').then(res=>res.json()).then(data=>{
-          const container = document.getElementById('userScriptsContainer');
-          container.innerHTML = '';
-          if(data.scripts.length === 0) {
-              container.innerHTML = '<p style="color:var(--text-secondary);">No scripts available at the moment.</p>';
-              return;
-          }
-          
-          let now = new Date().getTime();
-          window.userScriptsData = {}; 
-          
-          data.scripts.forEach(s => {
-              let releaseTime = new Date(s.release_date).getTime();
-              let isLocked = releaseTime > now;
-              
-              window.userScriptsData[s.id] = s.script_code;
-              
-              let btnHtml = '';
-              if (isLocked) {
-                  let dateStr = new Date(s.release_date).toLocaleString();
-                  btnHtml = `<button class="copy-btn" disabled><i data-lucide="lock" style="width:16px;height:16px;"></i> Unlocks: ${dateStr}</button>`;
-              } else {
-                  btnHtml = `<button class="copy-btn" onclick="copyDynamicScript(this, ${s.id})" data-i18n="s_copy"><i data-lucide="copy" style="width:16px;height:16px;"></i> COPY LUA SCRIPT</button>`;
-              }
-              
-              container.innerHTML += `
-              <div class="script-card">
-                <div class="script-banner" style="background-image: url('${s.banner_url}');">
-                </div>
-                <div class="script-content">
-                  <div class="script-header">
-                      <h3>${s.title}</h3>
-                      <span class="game-tag">for game: ${s.game}</span>
-                  </div>
-                  <p class="script-desc">${s.description}</p>
-                  ${btnHtml}
-                </div>
-              </div>`;
-          });
-          updateIcons();
-          initTiltEffect();
-      });
-  }
-
   function loadAdminScripts() {
       fetch('/api/get_scripts?admin=true').then(res=>res.json()).then(data=>{
-          const tbody = document.getElementById('devScriptsTableBody');
-          tbody.innerHTML = '';
-          window.adminScriptsData = {}; 
-          
+          const tbody = document.getElementById('devScriptsTableBody'); tbody.innerHTML = ''; adminScriptsData = {}; 
           data.scripts.forEach(s => {
-              window.adminScriptsData[s.id] = s;
-              let f_icon = s.is_frozen === 'Yes' ? 'snowflake' : 'pause';
-              let f_color = s.is_frozen === 'Yes' ? 'dev-btn-danger' : '';
-
-              tbody.innerHTML += `
-              <tr style="opacity: ${s.is_frozen === 'Yes' ? '0.5' : '1'}">
-                  <td><b>${s.title}</b></td>
-                  <td>${s.game}</td>
-                  <td>${s.release_date}</td>
-                  <td>
-                      <div style="display:flex; gap:8px;">
-                          <button class="dev-btn-sm" onclick="editAdminScript(${s.id})"><i data-lucide="edit-3" style="width:14px;height:14px;"></i></button>
-                          <button class="dev-btn-sm ${f_color}" onclick="toggleFreezeScript(${s.id})"><i data-lucide="${f_icon}" style="width:14px;height:14px;"></i></button>
-                          <button class="dev-btn-sm dev-btn-danger" onclick="deleteScript(${s.id})"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>
-                      </div>
-                  </td>
-              </tr>`;
-          });
-          updateIcons();
+              adminScriptsData[s.id] = s; let f_icon = s.is_frozen === 'Yes' ? 'snowflake' : 'pause'; let f_color = s.is_frozen === 'Yes' ? 'dev-btn-danger' : '';
+              tbody.innerHTML += `<tr style="opacity: ${s.is_frozen === 'Yes' ? '0.5' : '1'}"><td><b>${s.title}</b></td><td>${s.game}</td><td>${s.release_date}</td><td><div style="display:flex; gap:8px;"><button class="dev-btn-sm" onclick="editAdminScript(${s.id})"><i data-lucide="edit-3" style="width:14px;height:14px;"></i></button><button class="dev-btn-sm ${f_color}" onclick="toggleFreezeScript(${s.id})"><i data-lucide="${f_icon}" style="width:14px;height:14px;"></i></button><button class="dev-btn-sm dev-btn-danger" onclick="deleteScript(${s.id})"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button></div></td></tr>`;
+          }); updateIcons();
       });
   }
-
   function editAdminScript(id) {
-      const s = window.adminScriptsData[id];
-      if (!s) return;
-      document.getElementById('devScriptId').value = s.id;
-      document.getElementById('devScriptTitle').value = s.title;
-      document.getElementById('devScriptGame').value = s.game;
-      document.getElementById('devScriptBanner').value = s.banner_url;
-      document.getElementById('devScriptDate').value = s.release_date;
-      document.getElementById('devScriptCode').value = s.script_code;
-      document.getElementById('devScriptDesc').value = s.description;
+      const s = adminScriptsData[id]; if (!s) return;
+      document.getElementById('devScriptId').value = s.id; document.getElementById('devScriptTitle').value = s.title; document.getElementById('devScriptGame').value = s.game; document.getElementById('devScriptBanner').value = s.banner_url; document.getElementById('devScriptDiscord').value = s.script_discord || ''; document.getElementById('devScriptDate').value = s.release_date; document.getElementById('devScriptExecutors').value = s.executors_info || ''; document.getElementById('devScriptCode').value = s.script_code; document.getElementById('devScriptDesc').value = s.description;
   }
-
-  function copyDynamicScript(btn, id) {
-    const finalCode = window.userScriptsData[id];
-    if (!finalCode) return;
-    navigator.clipboard.writeText(finalCode).then(() => {
-      const originalHtml = btn.innerHTML; 
-      btn.innerHTML = '<i data-lucide="check" style="width:16px;height:16px;"></i> Copied!'; 
-      btn.style.backgroundColor = 'var(--success)'; btn.style.color = '#fff';
-      updateIcons();
-      setTimeout(() => { btn.innerHTML = originalHtml; btn.style.backgroundColor = ''; btn.style.color = ''; updateIcons(); }, 2000);
-    });
-  }
-
   function saveAdminScript() {
-      const id = document.getElementById('devScriptId').value;
-      const title = document.getElementById('devScriptTitle').value.trim();
-      const game = document.getElementById('devScriptGame').value.trim();
-      const banner = document.getElementById('devScriptBanner').value.trim();
-      const date = document.getElementById('devScriptDate').value;
-      const code = document.getElementById('devScriptCode').value.trim();
-      const desc = document.getElementById('devScriptDesc').value.trim();
-      
-      if(!title || !game || !banner || !date || !code || !desc) {
-          showConfirm('Error', 'Please fill all script fields!', 'OK', false, null, true);
-          return;
-      }
-      
-      fetch('/admin/save_script', {
-          method: 'POST', headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({id, title, game, banner_url: banner, release_date: date, script_code: code, description: desc})
-      }).then(res=>res.json()).then(data=>{
-          if(data.success) { clearScriptForm(); loadAdminScripts(); loadUserScripts(); }
-      });
+      const id = document.getElementById('devScriptId').value; const title = document.getElementById('devScriptTitle').value.trim(); const game = document.getElementById('devScriptGame').value.trim(); const banner = document.getElementById('devScriptBanner').value.trim(); const discord = document.getElementById('devScriptDiscord').value.trim(); const date = document.getElementById('devScriptDate').value; const execs = document.getElementById('devScriptExecutors').value.trim(); const code = document.getElementById('devScriptCode').value.trim(); const desc = document.getElementById('devScriptDesc').value.trim();
+      if(!title || !game || !banner || !date || !code || !desc) { showConfirm('Error', 'Please fill all required script fields!', 'OK', false, null, true); return; }
+      fetch('/admin/save_script', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id, title, game, banner_url: banner, release_date: date, script_code: code, description: desc, executors_info: execs, script_discord: discord}) }).then(res=>res.json()).then(data=>{ if(data.success) { clearScriptForm(); loadAdminScripts(); loadUserScripts(); } });
   }
-
-  function clearScriptForm() {
-      document.getElementById('devScriptId').value = '';
-      document.getElementById('devScriptTitle').value = '';
-      document.getElementById('devScriptGame').value = '';
-      document.getElementById('devScriptBanner').value = '';
-      document.getElementById('devScriptDate').value = '';
-      document.getElementById('devScriptCode').value = '';
-      document.getElementById('devScriptDesc').value = '';
-  }
-
-  function toggleFreezeScript(id) {
-      fetch('/admin/freeze_script', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id}) })
-      .then(res=>res.json()).then(data => { if(data.success){ loadAdminScripts(); loadUserScripts(); } });
-  }
-
-  function deleteScript(id) {
-      showConfirm('Delete Script', 'Are you sure you want to permanently delete this script?', 'Delete', true, () => {
-          fetch('/admin/delete_script', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id}) })
-          .then(res=>res.json()).then(data => { if(data.success){ loadAdminScripts(); loadUserScripts(); } });
-      });
-  }
-
-  function submitUserTicket() {
-      const reason = document.getElementById('uTicketReason').value.trim();
-      const prio = document.getElementById('uTicketPriority').value;
-      if(!reason) return;
-      fetch('/api/submit_ticket', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason, priority: prio }) }).then(res=>res.json()).then(data=>{
-          if(data.success) { document.getElementById('ticketSuccessOverlay').style.display='flex'; checkUserTicketState(); }
-      });
-  }
-
-  function checkUserTicketState() {
-      fetch('/api/get_user_ticket').then(res=>res.json()).then(data=>{
-          if(data.ticket) {
-              document.getElementById('userTicketFormCard').style.display = 'none';
-              document.getElementById('userTicketChatCard').style.display = 'flex';
-              document.getElementById('uChatBadge').innerText = data.ticket.status;
-              activeTicketId = data.ticket.id;
-              
-              const box = document.getElementById('uChatBox');
-              box.innerHTML = '';
-              data.messages.forEach(m => {
-                  const cl = m.sender === 'user' ? 'chat-msg user' : 'chat-msg dev';
-                  box.innerHTML += `<div class="${cl}"><b>${m.sender}:</b> ${m.message}</div>`;
-              });
-              box.scrollTop = box.scrollHeight;
-              
-              if(data.ticket.status === 'closed') {
-                  document.getElementById('uChatInputs').style.display = 'none';
-                  document.getElementById('uChatBadge').innerText = "Closed ✔️";
-              } else {
-                  document.getElementById('uChatInputs').style.display = 'flex';
-              }
-          } else {
-              document.getElementById('userTicketFormCard').style.display = 'block';
-              document.getElementById('userTicketChatCard').style.display = 'none';
-          }
-      });
-  }
-
+  function clearScriptForm() { document.getElementById('devScriptId').value = ''; document.getElementById('devScriptTitle').value = ''; document.getElementById('devScriptGame').value = ''; document.getElementById('devScriptBanner').value = ''; document.getElementById('devScriptDiscord').value = ''; document.getElementById('devScriptDate').value = ''; document.getElementById('devScriptExecutors').value = ''; document.getElementById('devScriptCode').value = ''; document.getElementById('devScriptDesc').value = ''; }
+  function toggleFreezeScript(id) { fetch('/admin/freeze_script', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id}) }).then(res=>res.json()).then(data => { if(data.success){ loadAdminScripts(); loadUserScripts(); } }); }
+  function deleteScript(id) { showConfirm('Delete Script', 'Are you sure you want to permanently delete this script?', 'Delete', true, () => { fetch('/admin/delete_script', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id}) }).then(res=>res.json()).then(data => { if(data.success){ loadAdminScripts(); loadUserScripts(); } }); }); }
   function pollAdminTickets() {
       fetch('/api/admin_get_tickets').then(res=>res.json()).then(data=>{
           if(!data.success) return;
-          const cont = document.getElementById('adminTicketsContainer');
-          cont.innerHTML = '';
-          const tix = data.tickets;
-          if(tix.length > 3) document.getElementById('btnShowAllTickets').style.display = 'block';
-          else document.getElementById('btnShowAllTickets').style.display = 'none';
-          
+          const cont = document.getElementById('adminTicketsContainer'); cont.innerHTML = ''; const tix = data.tickets;
+          if(tix.length > 3) document.getElementById('btnShowAllTickets').style.display = 'block'; else document.getElementById('btnShowAllTickets').style.display = 'none';
           let count = showAllTix ? tix.length : Math.min(3, tix.length);
           for(let i=0; i<count; i++) {
-              let t = tix[i];
-              let cl = t.status === 'closed' ? 'ticket-item closed' : (t.id === activeTicketId ? 'ticket-item active' : 'ticket-item');
+              let t = tix[i]; let cl = t.status === 'closed' ? 'ticket-item closed' : (t.id === activeTicketId ? 'ticket-item active' : 'ticket-item');
               let mark = t.status === 'closed' ? '<i data-lucide="check-circle" style="color:var(--success);"></i>' : '<i data-lucide="alert-circle" style="color:#ff9f0a;"></i>';
               let btns = t.status === 'pending' ? `<button class="dev-btn-sm" style="background:var(--success); color:#fff; border:none;" onclick="actionTicket(${t.id}, 'accept')"><i data-lucide="check" style="width:14px;height:14px;"></i></button><button class="dev-btn-sm dev-btn-danger" onclick="actionTicket(${t.id}, 'reject')"><i data-lucide="x" style="width:14px;height:14px;"></i></button>` : `<button class="dev-btn-sm" onclick="openAdminChat(${t.id}, '${t.user_login}')"><i data-lucide="message-circle" style="width:14px;height:14px;"></i> Chat</button>`;
-              
               if(t.status === 'closed') btns = `<span style="opacity:0.5;">Resolved</span>`;
-              
-              cont.innerHTML += `<div class="${cl}">
-                  <div style="display:flex; align-items:center;">
-                      <span class="ticket-icon" style="margin-right:10px;">${mark}</span>
-                      <div><b>${t.user_login}</b> <span style="opacity:0.5; font-size:11px;">[${t.priority}]</span><br><span style="font-size:12px;">${t.reason}</span></div>
-                  </div>
-                  <div style="display:flex; gap:6px;">${btns}</div>
-              </div>`;
-          }
-          updateIcons();
-          if(activeTicketId) updateAdminChat(activeTicketId);
+              cont.innerHTML += `<div class="${cl}"><div style="display:flex; align-items:center;"><span class="ticket-icon" style="margin-right:10px;">${mark}</span><div><b>${t.user_login}</b> <span style="opacity:0.5; font-size:11px;">[${t.priority}]</span><br><span style="font-size:12px;">${t.reason}</span></div></div><div style="display:flex; gap:6px;">${btns}</div></div>`;
+          } updateIcons(); if(activeTicketId) updateAdminChat(activeTicketId);
       });
   }
-
   function toggleAllTickets() { showAllTix = !showAllTix; document.getElementById('btnShowAllTickets').innerText = showAllTix ? "Show Less" : i18n[currentLang].t_show_all; pollAdminTickets(); }
-
-  function actionTicket(id, action) {
-      fetch('/api/ticket_action', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id, action }) }).then(() => pollAdminTickets());
-  }
-
-  function openAdminChat(id, user) {
-      activeTicketId = id;
-      document.getElementById('adminChatView').style.display = 'block';
-      document.getElementById('adminChatTitle').innerText = "Chat with " + user;
-      updateAdminChat(id);
-  }
-
-  function closeActiveTicket() {
-      if(!activeTicketId) return;
-      actionTicket(activeTicketId, 'close');
-      document.getElementById('adminChatView').style.display = 'none';
-      activeTicketId = null;
-  }
-
-  function updateAdminChat(id) {
-      fetch('/api/get_messages?id='+id).then(res=>res.json()).then(data=>{
-          const box = document.getElementById('aChatBox');
-          box.innerHTML = '';
-          data.messages.forEach(m => {
-              const cl = m.sender === 'dev' ? 'chat-msg dev' : 'chat-msg user';
-              box.innerHTML += `<div class="${cl}"><b>${m.sender}:</b> ${m.message}</div>`;
-          });
-          box.scrollTop = box.scrollHeight;
-      });
-  }
-
-  function sendTicketMessage(role) {
-      const inputId = role === 'user' ? 'uChatInput' : 'aChatInput';
-      const msg = document.getElementById(inputId).value.trim();
-      if(!msg || !activeTicketId) return;
-      
-      fetch('/api/send_message', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id: activeTicketId, message: msg, role }) }).then(() => {
-          document.getElementById(inputId).value = '';
-          if(role === 'user') checkUserTicketState(); else updateAdminChat(activeTicketId);
-      });
-  }
-
-  function refreshConsoleLogs() {
-     fetch('/admin/get_logs').then(res => res.json()).then(data => {
-        if(data.success) {
-           const box = document.getElementById('webConsoleBox'); box.innerHTML = '';
-           data.logs.forEach(l => { box.innerHTML += `<div class="web-log-line web-log-${l.level}">${l.text}</div>`; }); box.scrollTop = box.scrollHeight;
-        }
-     });
-  }
-
-  function promptAdminChangePlan(login, newPlan) {
-      if(!newPlan) return;
-      showConfirm('Update Plan', i18n[currentLang].prompt_msg, 'Update', false, (msg) => {
-          fetch('/admin/change_plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: login, plan: newPlan, message: msg || 'Enjoy!' }) }).then(res => res.json()).then(data => { 
-              if(data.success) refreshAdminData(); else showConfirm('Error', data.message, 'OK', false, null, true);
-          });
-      }, false, true);
-  }
-  function promptAdminAddDays(login) {
-      showConfirm('Add +7 Days', i18n[currentLang].prompt_msg, 'Add', false, (msg) => {
-          fetch('/admin/add_days', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: login, message: msg || 'Keep up the good work!' }) }).then(res => res.json()).then(data => { 
-              if(data.success) refreshAdminData(); else showConfirm('Error', data.message, 'OK', false, null, true);
-          });
-      }, false, true);
-  }
-
+  function actionTicket(id, action) { fetch('/api/ticket_action', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id, action }) }).then(() => pollAdminTickets()); }
+  function openAdminChat(id, user) { activeTicketId = id; document.getElementById('adminChatView').style.display = 'block'; document.getElementById('adminChatTitle').innerText = "Chat with " + user; updateAdminChat(id); }
+  function closeActiveTicket() { if(!activeTicketId) return; actionTicket(activeTicketId, 'close'); document.getElementById('adminChatView').style.display = 'none'; activeTicketId = null; }
+  function updateAdminChat(id) { fetch('/api/get_messages?id='+id).then(res=>res.json()).then(data=>{ const box = document.getElementById('aChatBox'); box.innerHTML = ''; data.messages.forEach(m => { const cl = m.sender === 'dev' ? 'chat-msg dev' : 'chat-msg user'; box.innerHTML += `<div class="${cl}"><b>${m.sender}:</b> ${m.message}</div>`; }); box.scrollTop = box.scrollHeight; }); }
+  function sendTicketMessage(role) { const inputId = role === 'user' ? 'uChatInput' : 'aChatInput'; const msg = document.getElementById(inputId).value.trim(); if(!msg || !activeTicketId) return; fetch('/api/send_message', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id: activeTicketId, message: msg, role }) }).then(() => { document.getElementById(inputId).value = ''; if(role === 'user') checkUserTicketState(); else updateAdminChat(activeTicketId); }); }
+  function refreshConsoleLogs() { fetch('/admin/get_logs').then(res => res.json()).then(data => { if(data.success) { const box = document.getElementById('webConsoleBox'); box.innerHTML = ''; data.logs.forEach(l => { box.innerHTML += `<div class="web-log-line web-log-${l.level}">${l.text}</div>`; }); box.scrollTop = box.scrollHeight; } }); }
+  function promptAdminChangePlan(login, newPlan) { if(!newPlan) return; showConfirm('Update Plan', i18n[currentLang].prompt_msg, 'Update', false, (msg) => { fetch('/admin/change_plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: login, plan: newPlan, message: msg || 'Enjoy!' }) }).then(res => res.json()).then(data => { if(data.success) refreshAdminData(); else showConfirm('Error', data.message, 'OK', false, null, true); }); }, false, true); }
+  function promptAdminAddDays(login) { showConfirm('Add +7 Days', i18n[currentLang].prompt_msg, 'Add', false, (msg) => { fetch('/admin/add_days', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: login, message: msg || 'Keep up the good work!' }) }).then(res => res.json()).then(data => { if(data.success) refreshAdminData(); else showConfirm('Error', data.message, 'OK', false, null, true); }); }, false, true); }
   function adminToggleFreeze(login) { fetch('/admin/toggle_freeze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login }) }).then(res => res.json()).then(data => { if(data.success) refreshAdminData(); else showConfirm('Error', data.message, 'OK', false, null, true); }); }
   function adminToggleMaintenance() { fetch('/admin/toggle_maintenance', { method: 'POST' }).then(res => res.json()).then(data => { if(data.success) refreshAdminData(); }); }
+  function requestAdminDeleteUser(login) { showConfirm('Delete User', `Are you sure you want to permanently delete '${login}'?`, 'Delete', true, () => { fetch('/admin/delete_user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login }) }).then(res => res.json()).then(data => { if(data.success) refreshAdminData(); else showConfirm('Error', data.message, 'OK', false, null, true); }); }); }
+  function adminUpdateDiscordLink() { const link = document.getElementById('devDiscordLink').value.trim(); fetch('/admin/update_discord', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ link }) }).then(res => res.json()).then(data => { if(data.success) { document.getElementById('discordJoinBtn').href = link; showConfirm('Success', 'Discord link updated successfully!', 'OK', false, null, true); } }); }
+  function loadCaptcha() { fetch('/api/captcha').then(res => res.json()).then(data => { document.getElementById('captchaBox').innerText = data.text; document.getElementById('regCaptcha').value = ''; }); }
 
-  function requestAdminDeleteUser(login) { 
-      showConfirm('Delete User', `Are you sure you want to permanently delete '${login}'?`, 'Delete', true, () => {
-          fetch('/admin/delete_user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login }) }).then(res => res.json()).then(data => { if(data.success) refreshAdminData(); else showConfirm('Error', data.message, 'OK', false, null, true); }); 
-      });
-  }
-
-  function adminUpdateDiscordLink() {
-      const link = document.getElementById('devDiscordLink').value.trim();
-      fetch('/admin/update_discord', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ link }) }).then(res => res.json()).then(data => {
-          if(data.success) { document.getElementById('discordJoinBtn').href = link; showConfirm('Success', 'Discord link updated successfully!', 'OK', false, null, true); }
-      });
-  }
-
-  function closeRewardScreen() {
-      fetch('/api/clear_reward', { method: 'POST' }).then(() => { document.getElementById('rewardScreen').style.display = 'none'; });
-  }
-
-  function loadCaptcha() {
-      fetch('/api/captcha').then(res => res.json()).then(data => { document.getElementById('captchaBox').innerText = data.text; document.getElementById('regCaptcha').value = ''; });
-  }
-
-  const canvas = document.getElementById('bgCanvas'); const ctx = canvas.getContext('2d');
-  let width, height, particles = [], mouse = { x: -1000, y: -1000 }, currentDotColor = 'rgba(255, 255, 255, 0.3)', isErrorState = false, isSystemLoading = false; 
-  function updateCanvasColor() { currentDotColor = getComputedStyle(document.body).getPropertyValue('--dot-color').trim(); }
-  function resize() { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; initParticles(); }
-  window.addEventListener('resize', resize);
-  class Particle {
-    constructor() { this.x = Math.random() * width; this.y = Math.random() * height; this.size = Math.random() * 2 + 1; this.density = (Math.random() * 20) + 5; this.angle = Math.random() * 360; this.speed = Math.random() * 0.3 + 0.1; this.vx = 0; this.vy = 0; this.friction = 0.92; }
-    update() {
-      this.angle += 0.01;
-      
-      if (globalWarpSpeedY > 0) {
-          this.y -= globalWarpSpeedY * (this.speed * 2);
-      } else {
-          if (isSystemLoading) { this.vy -= 1.5; this.vx += (Math.random() - 0.5) * 0.2; } 
-          else { this.vy -= this.speed * 0.1; this.vx += Math.sin(this.angle) * 0.05; }
+  // 5. ИНИЦИАЛИЗАЦИЯ CANVAS (ЧАСТИЦЫ)
+  function initCanvasParticles() {
+      const canvas = document.getElementById('bgCanvas');
+      if(!canvas) return;
+      const ctx = canvas.getContext('2d');
+      let width, height, particles = [], mouse = { x: -1000, y: -1000 };
+      function updateCanvasColor() { currentDotColor = getComputedStyle(document.body).getPropertyValue('--dot-color').trim(); }
+      function resize() { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; particles = []; let num = (width * height) / 8000; for(let i=0; i<num; i++) particles.push(new Particle()); }
+      class Particle {
+        constructor() { this.x = Math.random() * width; this.y = Math.random() * height; this.size = Math.random() * 2 + 1; this.angle = Math.random() * 360; this.speed = Math.random() * 0.3 + 0.1; this.vx = 0; this.vy = 0; this.friction = 0.92; }
+        update() {
+          this.angle += 0.01;
+          if (globalWarpSpeedY > 0) { this.y -= globalWarpSpeedY * (this.speed * 2); } else {
+              if (isSystemLoading) { this.vy -= 1.5; this.vx += (Math.random() - 0.5) * 0.2; } else { this.vy -= this.speed * 0.1; this.vx += Math.sin(this.angle) * 0.05; }
+          }
+          let dx = mouse.x - this.x, dy = mouse.y - this.y, distance = Math.sqrt(dx * dx + dy * dy), maxDistance = 180;
+          if (distance < maxDistance) { let force = (maxDistance - distance) / maxDistance; this.vx -= (dx / distance) * force * 1.5; this.vy -= (dy / distance) * force * 1.5; }
+          this.vx *= this.friction; this.vy *= this.friction; this.x += this.vx; this.y += this.vy;
+          if (this.y < -20) { this.y = height + 20; this.x = Math.random() * width; this.vx = 0; this.vy = 0;}
+          if (this.y > height + 20) { this.y = -20; this.x = Math.random() * width; this.vx = 0; this.vy = 0;}
+          if (this.x < -20) { this.x = width + 20; this.vx = 0; this.vy = 0;}
+          if (this.x > width + 20) { this.x = -20; this.vx = 0; this.vy = 0;}
+        }
+        draw() { ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fillStyle = isErrorState ? '#ea1515' : currentDotColor; ctx.fill(); }
       }
-
-      let dx = mouse.x - this.x, dy = mouse.y - this.y, distance = Math.sqrt(dx * dx + dy * dy), maxDistance = 180;
-      if (distance < maxDistance) { let force = (maxDistance - distance) / maxDistance; this.vx -= (dx / distance) * force * 1.5; this.vy -= (dy / distance) * force * 1.5; }
-      this.vx *= this.friction; this.vy *= this.friction; this.x += this.vx; this.y += this.vy;
-      if (this.y < -20) { this.y = height + 20; this.x = Math.random() * width; this.vx = 0; this.vy = 0;}
-      if (this.y > height + 20) { this.y = -20; this.x = Math.random() * width; this.vx = 0; this.vy = 0;}
-      if (this.x < -20) { this.x = width + 20; this.vx = 0; this.vy = 0;}
-      if (this.x > width + 20) { this.x = -20; this.vx = 0; this.vy = 0;}
-    }
-    draw() { ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fillStyle = isErrorState ? '#ea1515' : currentDotColor; ctx.fill(); }
+      window.addEventListener('resize', resize);
+      window.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
+      window.addEventListener('mouseout', () => { mouse.x = -1000; mouse.y = -1000; });
+      function animate() { 
+          ctx.clearRect(0, 0, width, height); 
+          if (globalWarpSpeedY > 0) { globalWarpSpeedY *= 0.94; if (globalWarpSpeedY < 0.1) globalWarpSpeedY = 0; }
+          for (let i = 0; i < particles.length; i++) { particles[i].update(); particles[i].draw(); } 
+          requestAnimationFrame(animate); 
+      }
+      updateCanvasColor(); resize(); animate();
+      document.getElementById('themeBtn').addEventListener('click', () => { setTimeout(updateCanvasColor, 100); });
   }
-  function initParticles() { particles = []; let numberOfParticles = (width * height) / 8000; for (let i = 0; i < numberOfParticles; i++) particles.push(new Particle()); }
-  window.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
-  window.addEventListener('mouseout', () => { mouse.x = -1000; mouse.y = -1000; });
-  function animate() { 
-      ctx.clearRect(0, 0, width, height); 
-      if (globalWarpSpeedY > 0) { globalWarpSpeedY *= 0.94; if (globalWarpSpeedY < 0.1) globalWarpSpeedY = 0; }
-      for (let i = 0; i < particles.length; i++) { particles[i].update(); particles[i].draw(); } 
-      requestAnimationFrame(animate); 
-  }
-  updateCanvasColor(); resize(); animate();
 
-  const themeBtn = document.getElementById('themeBtn');
-  document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'dark');
-  updateCanvasColor();
-  themeBtn.addEventListener('click', () => {
-    const newTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', newTheme); localStorage.setItem('theme', newTheme); updateCanvasColor();
-  });
-  setInterval(() => { fetch('/get_time').then(res => res.json()).then(data => { document.getElementById('clock').innerText = data.time; }); }, 1000);
-
-  const sidebarBtns = document.querySelectorAll('.sidebar-btn');
-  const tabContents = document.querySelectorAll('.tab-content');
-  function switchTab(targetId) {
-    sidebarBtns.forEach(b => b.classList.remove('active')); tabContents.forEach(t => t.classList.remove('active'));
-    sidebarBtns.forEach(b => { if(b.getAttribute('data-target') === targetId) b.classList.add('active'); }); document.getElementById(targetId).classList.add('active');
-    if(targetId === 'tab-faq' && !document.getElementById('userTicketChatCard').style.display.includes('none')) { checkUserTicketState(); }
-    if(targetId === 'tab-scripts') { loadUserScripts(); }
-    initTiltEffect(); 
-  }
-  sidebarBtns.forEach(btn => btn.addEventListener('click', () => switchTab(btn.getAttribute('data-target'))));
-  document.getElementById('userDisplay').addEventListener('click', () => switchTab('tab-main'));
-
-  let loadingInterval;
-  function showLoadingScreen() { document.getElementById('loaderScreen').style.display = 'flex'; isSystemLoading = true; let i = 0; const txts = ["Authenticating...", "Decrypting...", "Loading Modules..."]; document.getElementById('loaderDynamicText').innerText = txts[i]; loadingInterval = setInterval(() => { i = (i + 1) % txts.length; document.getElementById('loaderDynamicText').innerText = txts[i]; }, 500); }
-  function hideLoadingScreen() { document.getElementById('loaderScreen').style.display = 'none'; isSystemLoading = false; clearInterval(loadingInterval); }
-
+  // 6. ЗАПУСК ВСЕХ СОБЫТИЙ
   document.addEventListener('DOMContentLoaded', () => {
+    updateIcons();
+    initCanvasParticles();
+
     const savedLang = localStorage.getItem('lang') || 'en'; setLang(savedLang);
-    const appMainWrapper = document.getElementById('appMainWrapper'); const authForm = document.getElementById('authForm'); const secretForm = document.getElementById('secretForm'); const regForm = document.getElementById('regForm'); const twoFaForm = document.getElementById('twoFaForm'); const createAccountWrapper = document.getElementById('createAccountWrapper');
+
+    // Подключаем меню
+    const sidebarBtns = document.querySelectorAll('.sidebar-btn');
+    sidebarBtns.forEach(btn => btn.addEventListener('click', () => switchTab(btn.getAttribute('data-target'))));
+    document.getElementById('userDisplay').addEventListener('click', () => switchTab('tab-main'));
+    document.getElementById('modalCancelBtn').addEventListener('click', closeConfirm);
+    document.getElementById('modalConfirmBtn').addEventListener('click', () => { const val = document.getElementById('modalInput').value.trim(); if(confirmActionCallback) confirmActionCallback(val); closeConfirm(); });
     
-    if ({{ show_freeze }}) { document.getElementById('introOverlay').style.display = 'none'; appMainWrapper.style.display = 'none'; document.getElementById('freezeScreen').style.display = 'flex'; return; }
-    if ({{ show_maintenance }}) {
-        document.getElementById('introOverlay').style.display = 'none';
-        appMainWrapper.style.display = 'none'; document.getElementById('maintenanceScreen').style.display = 'flex';
-        let lockClicks = 0; document.getElementById('maintenanceLockIcon').addEventListener('click', () => { lockClicks++; if (lockClicks >= 3) { document.getElementById('maintenanceScreen').style.display = 'none'; document.getElementById('landingWrapper').style.display = 'flex'; authForm.style.display = 'flex'; } });
-        return;
+    // Бэкап БД
+    const dbUploadInput = document.getElementById('dbUploadInput');
+    if(dbUploadInput) {
+        dbUploadInput.addEventListener('change', function() {
+            if (!this.files || this.files.length === 0) return;
+            showConfirm('Restore Database', 'Are you sure you want to OVERWRITE the current database? This cannot be undone!', 'Restore', true, () => {
+                const formData = new FormData(); formData.append('file', this.files[0]);
+                fetch('/admin/restore_db', { method: 'POST', body: formData })
+                .then(res => res.json()).then(data => {
+                    if (data.success) { showConfirm('Success', 'Database restored successfully! Reloading...', 'OK', false, () => window.location.reload(), true); } 
+                    else { showConfirm('Error', data.message || 'Restore failed', 'OK', false, null, true); }
+                });
+            });
+            this.value = ''; 
+        });
     }
 
+    // Глазики
+    const bigEyeCont = document.getElementById('bigEyeContainer');
+    const bigEyePupil = document.getElementById('bigEyePupil');
+
+    function setupPasswordToggle(inputId, toggleId) {
+        const inp = document.getElementById(inputId);
+        const tog = document.getElementById(toggleId);
+        if(!inp || !tog) return;
+        tog.addEventListener('click', () => {
+            if(inp.type === 'password') {
+                inp.type = 'text'; tog.setAttribute('data-lucide', 'eye');
+                if(inputId === 'password' || inputId === 'regPassword') { bigEyeCont.classList.add('show'); }
+                updateIcons();
+            } else {
+                inp.type = 'password'; tog.setAttribute('data-lucide', 'eye-off');
+                if(inputId === 'password' || inputId === 'regPassword') { bigEyeCont.classList.remove('show'); bigEyePupil.setAttribute('cx', '50'); }
+                updateIcons();
+            }
+        });
+        inp.addEventListener('input', () => {
+            if(inp.type === 'text' && (inputId === 'password' || inputId === 'regPassword')) {
+                let len = inp.value.length; let maxLen = 20; let ratio = Math.min(len / maxLen, 1);
+                let newCx = 35 + (30 * ratio); bigEyePupil.setAttribute('cx', newCx.toString());
+            }
+        });
+    }
+
+    setupPasswordToggle('password', 'toggleLoginPwd');
+    setupPasswordToggle('regPassword', 'toggleRegPwd');
+    setupPasswordToggle('regSecret', 'toggleRegSec');
+    setupPasswordToggle('devSecretCode', 'toggleSecretPwd');
+
+    // Логика авторизации
+    const authForm = document.getElementById('authForm'); const secretForm = document.getElementById('secretForm'); const regForm = document.getElementById('regForm'); const twoFaForm = document.getElementById('twoFaForm'); const createAccountWrapper = document.getElementById('createAccountWrapper');
+    
     document.getElementById('createAccountLink').addEventListener('click', () => { authForm.style.display = 'none'; regForm.style.display = 'flex'; loadCaptcha(); });
     document.getElementById('backToLoginLink').addEventListener('click', () => { regForm.style.display = 'none'; authForm.style.display = 'flex'; createAccountWrapper.classList.remove('show'); hideMessage('message'); });
     document.getElementById('cancelSecretLink').addEventListener('click', () => { secretForm.style.display = 'none'; authForm.style.display = 'flex'; });
@@ -1514,55 +1343,6 @@ button { position: relative; overflow: hidden; }
       });
     });
 
-    let isUserLoggedIn = {{ 'true' if current_user else 'false' }};
-    
-    if (isUserLoggedIn) { 
-        document.getElementById('introOverlay').style.display = 'none';
-        document.getElementById('landingWrapper').style.display = 'none';
-        appMainWrapper.style.display = 'flex';
-        loadDashboard(); 
-    } else {
-        setTimeout(() => {
-            const intro = document.getElementById('introOverlay');
-            if(intro) {
-                intro.style.opacity = '0';
-                setTimeout(() => {
-                    intro.style.display = 'none';
-                    document.getElementById('landingWrapper').style.display = 'flex';
-                    updateIcons();
-                    initTiltEffect();
-                }, 800);
-            }
-        }, 2000); 
-    }
-
-    function loadDashboard() {
-        document.getElementById('mainHeader').style.display = 'none'; document.getElementById('dashboardLayout').style.display = 'flex';
-        fetch('/get_user_info').then(res => res.json()).then(data => {
-            if(data.success) {
-                if(data.is_frozen === 'Yes') { window.location.reload(); }
-                if(data.pending_reward && data.pending_reward.type) {
-                    const rType = data.pending_reward.type; const rVal = data.pending_reward.value; const rMsg = data.pending_reward.msg;
-                    let valText = ""; if (rType === "plan") valText = "PLAN: " + rVal; if (rType === "days") valText = "+7 Days";
-                    document.getElementById('rewardValue').innerText = valText; document.getElementById('rewardMessage').innerText = rMsg; document.getElementById('rewardScreen').style.display = 'flex';
-                }
-                if(data.active_key) { document.getElementById('generatedKeyDisplay').innerText = data.active_key; document.getElementById('generatedKeyDisplay').style.display = 'block'; }
-                
-                const greetings = ["Welcome back", "Glad to see you", "Hello", "Ready for action", "Good to have you"];
-                const randGreet = greetings[Math.floor(Math.random() * greetings.length)];
-                document.getElementById('planGreeting').innerText = `${randGreet}, ${data.login}!`;
-
-                document.getElementById('userDisplay').innerHTML = `<i data-lucide="user" style="width:14px; height:14px;"></i> <span id="userLoginText">${data.login}</span>`;
-                document.getElementById('profileLogin').innerText = data.login; document.getElementById('profilePlan').innerText = data.plan; document.getElementById('profileRegDate').innerText = data.reg_date; document.getElementById('profileDevApproved').innerText = data.dev_approved; document.getElementById('planCurrentStatus').innerText = "Your current plan: " + data.plan + " - " + data.plan_days + " Days";
-                
-                loadUserScripts(); 
-                loadAdminPanel(data.dev_approved); setInterval(checkUserTicketState, 5000); checkUserTicketState();
-                updateIcons();
-            }
-        });
-    }
-
-    function triggerErrorAnimation(formEl) { formEl.classList.remove('shake-error'); setTimeout(() => formEl.classList.add('shake-error'), 10); setTimeout(() => formEl.classList.remove('shake-error'), 400); isErrorState = true; setTimeout(() => { isErrorState = false; }, 600); }
     document.getElementById('logoutBtn').addEventListener('click', () => { showConfirm('Sign Out', 'Are you sure you want to log out?', 'Logout', true, () => { fetch('/logout').then(() => window.location.reload()); }); });
 
     document.getElementById('signUpBtn').addEventListener('click', () => {
@@ -1572,9 +1352,9 @@ button { position: relative; overflow: hidden; }
       }).then(res => res.json()).then(data => {
         if (data.success) {
           if(data.is_frozen) { window.location.reload(); } 
-          else if(data.require_secret) { hideMessage('message'); authForm.style.display = 'none'; secretForm.style.display = 'flex'; } 
-          else if(data.require_2fa) { authForm.style.display = 'none'; twoFaForm.style.display = 'flex'; } 
-          else { hideMessage('message'); authForm.style.display = 'none'; document.getElementById('mainHeader').style.display = 'none'; showLoadingScreen(); setTimeout(() => { document.getElementById('clockWrapper').style.display = 'flex'; document.getElementById('userWrapper').style.display = 'flex'; hideLoadingScreen(); loadDashboard(); }, 2500); }
+          else if(data.require_secret) { hideMessage('message'); authForm.style.display = 'none'; secretForm.style.display = 'flex'; document.getElementById('bigEyeContainer').classList.remove('show'); } 
+          else if(data.require_2fa) { authForm.style.display = 'none'; twoFaForm.style.display = 'flex'; document.getElementById('bigEyeContainer').classList.remove('show'); } 
+          else { hideMessage('message'); authForm.style.display = 'none'; document.getElementById('bigEyeContainer').classList.remove('show'); document.getElementById('mainHeader').style.display = 'none'; showLoadingScreen(); setTimeout(() => { document.getElementById('clockWrapper').style.display = 'flex'; document.getElementById('userWrapper').style.display = 'flex'; hideLoadingScreen(); loadDashboard(); }, 2500); }
         } else { showMessage('message', 'Invalid credentials.', false); triggerErrorAnimation(authForm); createAccountWrapper.classList.add('show'); }
       });
     });
@@ -1594,7 +1374,40 @@ button { position: relative; overflow: hidden; }
           else { showMessage('twoFaMessage', data.message, false); triggerErrorAnimation(twoFaForm); }
        });
     });
+
+    const themeBtn = document.getElementById('themeBtn');
+    document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'dark');
+    themeBtn.addEventListener('click', () => {
+      const newTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', newTheme); localStorage.setItem('theme', newTheme); 
+    });
+    setInterval(() => { fetch('/get_time').then(res => res.json()).then(data => { document.getElementById('clock').innerText = data.time; }); }, 1000);
+
+    // ПРОВЕРКА СОСТОЯНИЯ (МОСТ)
+    if (SHOW_FREEZE) { document.getElementById('introOverlay').style.display = 'none'; document.getElementById('appMainWrapper').style.display = 'none'; document.getElementById('freezeScreen').style.display = 'flex'; return; }
+    if (SHOW_MAINTENANCE) { document.getElementById('introOverlay').style.display = 'none'; document.getElementById('appMainWrapper').style.display = 'none'; document.getElementById('maintenanceScreen').style.display = 'flex'; let lockClicks = 0; document.getElementById('maintenanceLockIcon').addEventListener('click', () => { lockClicks++; if (lockClicks >= 3) { document.getElementById('maintenanceScreen').style.display = 'none'; document.getElementById('landingWrapper').style.display = 'flex'; authForm.style.display = 'flex'; } }); return; }
+
+    if (IS_USER_LOGGED_IN) { 
+        document.getElementById('introOverlay').style.display = 'none';
+        document.getElementById('landingWrapper').style.display = 'none';
+        document.getElementById('appMainWrapper').style.display = 'flex';
+        loadDashboard(); 
+    } else {
+        setTimeout(() => {
+            const intro = document.getElementById('introOverlay');
+            if(intro) {
+                intro.style.opacity = '0';
+                setTimeout(() => {
+                    intro.style.display = 'none';
+                    document.getElementById('landingWrapper').style.display = 'flex';
+                    updateIcons();
+                    initTiltEffect();
+                }, 800);
+            }
+        }, 2000); 
+    }
   });
+
 </script>
 </body>
 </html>
@@ -1932,12 +1745,14 @@ def save_script():
     s_id = data.get('id'); title = data.get('title'); game = data.get('game')
     banner = data.get('banner_url'); r_date = data.get('release_date')
     code = data.get('script_code'); desc = data.get('description')
+    execs = data.get('executors_info', ''); discord = data.get('script_discord', '')
+    
     if s_id:
-        conn.execute('''UPDATE scripts SET title=?, game=?, banner_url=?, release_date=?, script_code=?, description=? WHERE id=?''',
-                     (title, game, banner, r_date, code, desc, s_id))
+        conn.execute('''UPDATE scripts SET title=?, game=?, banner_url=?, release_date=?, script_code=?, description=?, executors_info=?, script_discord=? WHERE id=?''',
+                     (title, game, banner, r_date, code, desc, execs, discord, s_id))
     else:
-        conn.execute('''INSERT INTO scripts (title, game, banner_url, release_date, script_code, description) VALUES (?, ?, ?, ?, ?, ?)''',
-                     (title, game, banner, r_date, code, desc))
+        conn.execute('''INSERT INTO scripts (title, game, banner_url, release_date, script_code, description, executors_info, script_discord) VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                     (title, game, banner, r_date, code, desc, execs, discord))
     conn.commit(); conn.close()
     return jsonify({'success': True})
 
@@ -2140,6 +1955,36 @@ def delete_account():
 def logout(): 
     session.pop('user', None)
     return ('', 204)
+
+# АПИ ДЛЯ БЭКАПА И ВОССТАНОВЛЕНИЯ БАЗЫ ДАННЫХ
+@app.route('/admin/backup_db', methods=['GET'])
+def backup_db():
+    current_user = session.get('user')
+    conn = get_db_connection()
+    check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
+    conn.close()
+    if not check or check['dev_approved'] != 'Yes': return "Access Denied", 403
+    db_path = os.path.abspath(DB_NAME)
+    return send_file(db_path, as_attachment=True, download_name=f"database_backup_{int(time.time())}.sqlite")
+
+@app.route('/admin/restore_db', methods=['POST'])
+def restore_db():
+    current_user = session.get('user')
+    conn = get_db_connection()
+    check = conn.execute("SELECT dev_approved FROM users WHERE login = ?", (current_user,)).fetchone()
+    conn.close()
+    if not check or check['dev_approved'] != 'Yes': return jsonify({'success': False}), 403
+    
+    if 'file' not in request.files: return jsonify({'success': False, 'message': 'No file part'})
+    file = request.files['file']
+    if file.filename == '': return jsonify({'success': False, 'message': 'No selected file'})
+    
+    try:
+        db_path = os.path.abspath(DB_NAME)
+        file.save(db_path)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
 
 if __name__ == '__main__':
     c_log('SERVICE', "Starting production server on port 5000...")
